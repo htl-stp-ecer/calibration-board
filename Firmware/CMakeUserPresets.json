@@ -1,0 +1,25 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "Debug",
+            "inherits": "default",
+            "environment": {
+                "PATH": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin:$penv{PATH}"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "Release",
+            "inherits": "default",
+            "environment": {
+                "PATH": "/opt/st/stm32cubeclt_1.21.0/GNU-tools-for-STM32/bin:$penv{PATH}"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ]
+}

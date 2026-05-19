@@ -1,0 +1,6 @@
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/CMakeFiles/Firmware.dir
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/CMakeFiles/edit_cache.dir
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/CMakeFiles/rebuild_cache.dir
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/build/Debug/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir

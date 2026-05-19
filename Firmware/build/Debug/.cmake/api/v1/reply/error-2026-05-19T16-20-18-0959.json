@@ -1,0 +1,46 @@
+{
+	"cmake" : 
+	{
+		"generator" : 
+		{
+			"multiConfig" : false,
+			"name" : "Ninja"
+		},
+		"paths" : 
+		{
+			"cmake" : "/home/matthias/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cmake",
+			"cpack" : "/home/matthias/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cpack",
+			"ctest" : "/home/matthias/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/ctest",
+			"root" : "/home/matthias/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/share/cmake-4.1"
+		},
+		"version" : 
+		{
+			"isDirty" : false,
+			"major" : 4,
+			"minor" : 1,
+			"patch" : 2,
+			"string" : "4.1.2",
+			"suffix" : ""
+		}
+	},
+	"objects" : [],
+	"reply" : 
+	{
+		"cache-v2" : 
+		{
+			"error" : "no buildsystem generated"
+		},
+		"cmakeFiles-v1" : 
+		{
+			"error" : "no buildsystem generated"
+		},
+		"codemodel-v2" : 
+		{
+			"error" : "no buildsystem generated"
+		},
+		"toolchains-v1" : 
+		{
+			"error" : "no buildsystem generated"
+		}
+	}
+}

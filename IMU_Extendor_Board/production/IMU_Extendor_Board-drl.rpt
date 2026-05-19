@@ -1,0 +1,27 @@
+Drill report for IMU_Extendor_Board.kicad_pcb
+Created on 2026-05-10T16:01:15+0200
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  B.Cu                      back
+
+
+Drill file 'IMU_Extendor_Board-PTH.drl' contains
+    plated through holes:
+    =============================================================
+    T1  0.300mm  0.0118"  (187 holes)
+    T2  0.400mm  0.0157"  (6 holes)
+    T3  0.600mm  0.0236"  (4 holes)  (with 4 slots)
+    T4  1.000mm  0.0394"  (17 holes)
+
+    Total plated holes count 214
+
+
+Drill file 'IMU_Extendor_Board-NPTH.drl' contains
+    unplated through holes:
+    =============================================================
+    T1  0.650mm  0.0256"  (2 holes)
+    T2  2.700mm  0.1063"  (4 holes)
+
+    Total unplated holes count 6
