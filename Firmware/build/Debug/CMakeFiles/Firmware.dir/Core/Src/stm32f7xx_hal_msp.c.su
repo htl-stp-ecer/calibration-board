@@ -1,7 +1,0 @@
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:62:6:HAL_MspInit	16	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:85:6:HAL_SPI_MspInit	64	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:180:6:HAL_SPI_MspDeInit	16	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:250:6:HAL_UART_MspInit	176	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:298:6:HAL_UART_MspDeInit	16	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:327:6:HAL_PCD_MspInit	176	static
-/home/matthias/Documents/Botball/IMU_Extendor_Board/Firmware/Core/Src/stm32f7xx_hal_msp.c:380:6:HAL_PCD_MspDeInit	16	static

@@ -1,0 +1,102 @@
+# ───────────────────────── Build outputs ─────────────────────────
+build/
+cmake-build-*/
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.lst
+*.su
+*.d
+*.o
+*.obj
+*.a
+*.lo
+
+# ───────────────────────── CMake ─────────────────────────────────
+# Local per-machine preset overrides (e.g. PATH tweaks for installed toolchains).
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# ───────────────────────── IDEs ──────────────────────────────────
+# JetBrains (CLion / IntelliJ): default-ignore everything, then whitelist the
+# files that genuinely benefit a fresh clone (debug-server config, run-configs,
+# VCS mapping, code style, inspections). Whitelisted dirs use `!path/` followed
+# by `!path/**` because of how gitignore's negation interacts with directories.
+.idea/**
+!.idea/.gitignore
+!.idea/vcs.xml
+!.idea/codeStyles/
+!.idea/codeStyles/**
+!.idea/inspectionProfiles/
+!.idea/inspectionProfiles/**
+!.idea/runConfigurations/
+!.idea/runConfigurations/**
+!.idea/debugServers/
+!.idea/debugServers/**
+!.idea/fileTemplates/
+!.idea/fileTemplates/**
+# .iml files contain absolute toolchain paths — never share.
+*.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+.idea/httpRequests/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Eclipse (STM32CubeIDE)
+.cproject
+.project
+.settings/
+Debug/
+Release/
+
+# ───────────────────────── KiCad ─────────────────────────────────
+# Per-user project local state (window positions, last-opened sheet, ...).
+*.kicad_prl
+# Auto-saved backups KiCad writes on every save — checked-in source files
+# already version this; don't double-version.
+*-backups/
+*.kicad_*-bak
+*.kicad_sch-bak
+*.kicad_pcb-bak
+# Symbol/footprint editor backup files (saved every N minutes).
+*.bak
+# Footprint info cache, regenerated on open.
+fp-info-cache
+# Lock files KiCad writes while a project is open.
+*.lck
+~*.lck
+~*.kicad_*
+
+# ───────────────────────── Docker ────────────────────────────────
+# Image cache is in the daemon, not the repo, but keep the trio clean.
+.dockerignore.local
+
+# ───────────────────────── Editor / OS junk ──────────────────────
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ───────────────────────── Logs / temp ───────────────────────────
+*.log
+*.tmp
+/tmp/
+
+# ───────────────────────── Secrets (just in case) ────────────────
+*.pem
+*.key
+.env
+.env.local
