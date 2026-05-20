@@ -42,14 +42,31 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
-# Add sources to executable
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+# ──────────────────────────── User code ────────────────────────────
+# Application logic and project-owned drivers live outside Core/ and Drivers/
+# so they survive STM32CubeMX regeneration. Convention: lowercase folders for
+# our code, capitalised for ST-generated code.
+
+file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/app/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/drivers/*/src/*.c"
 )
 
-# Add include paths
+# Third-party: CEVA sh2 driver for BNO08x (submodule under lib/sh2)
+file(GLOB SH2_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/sh2/*.c"
+)
+
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${USER_SOURCES}
+    ${SH2_SOURCES}
+)
+
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/bno08x/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/paa5100/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/sh2
 )
 
 # Add project symbols (macros)

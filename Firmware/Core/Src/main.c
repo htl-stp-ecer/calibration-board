@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -111,6 +111,7 @@ int main(void)
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
   HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);
+  app_main();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -141,11 +142,18 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  /* HSI-Workaround: Y202 (12 MHz HSE-Quarz) schwingt am Board nicht an
+   * (HSERDY bleibt 0). Bis das Hardware-Problem behoben ist, läuft die PLL
+   * vom internen HSI (16 MHz). VCO-input muss 1–2 MHz sein, also PLLM=8.
+   * 16 MHz / 8 × 192 / 2 = 192 MHz SYSCLK → APB2 = 96 MHz (SPI1 /32 = 3 MHz).
+   * Beim nächsten CubeMX-Regenerate-Lauf muss das wieder auf HSE umgestellt
+   * werden, sobald der Quarz angeht. */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 6;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 192;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 8;
