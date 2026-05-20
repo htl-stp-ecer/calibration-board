@@ -12,11 +12,13 @@ ELF="$BUILD_DIR/Firmware.elf"
 SWD_FREQ_KHZ="${SWD_FREQ_KHZ:-4000}"
 GDB_PORT="${GDB_PORT:-61234}"
 
-PROG_CLI="${PROG_CLI:-STM32_Programmer_CLI}"
-GDB_SERVER="${GDB_SERVER:-ST-LINK_gdbserver}"
-GDB="${GDB:-arm-none-eabi-gdb}"
+CUBECLT_ROOT="${CUBECLT_ROOT:-/opt/st/stm32cubeclt_1.21.0}"
+CUBECLT_PROG_BIN="$CUBECLT_ROOT/STM32CubeProgrammer/bin"
+CUBECLT_GDB_BIN="$CUBECLT_ROOT/STLink-gdb-server/bin"
 
-CUBECLT_PROG_BIN="/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin"
+PROG_CLI="${PROG_CLI:-$CUBECLT_PROG_BIN/STM32_Programmer_CLI}"
+GDB_SERVER="${GDB_SERVER:-$CUBECLT_GDB_BIN/ST-LINK_gdbserver}"
+GDB="${GDB:-arm-none-eabi-gdb}"
 
 # Strip libusb permission warnings and ANSI escapes from ST tool output.
 filter_st_output() {

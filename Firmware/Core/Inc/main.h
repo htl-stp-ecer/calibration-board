@@ -57,6 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define FLOW_MOSI_Pin GPIO_PIN_1
+#define FLOW_MOSI_GPIO_Port GPIOC
 #define FLOW_SENS_INT_Pin GPIO_PIN_2
 #define FLOW_SENS_INT_GPIO_Port GPIOA
 #define FLOW_SENS_CS_Pin GPIO_PIN_3
@@ -71,10 +73,13 @@ void Error_Handler(void);
 #define BNO_MOSI_GPIO_Port GPIOA
 #define BNO_INT_Pin GPIO_PIN_4
 #define BNO_INT_GPIO_Port GPIOC
+#define BNO_INT_EXTI_IRQn EXTI4_IRQn
 #define BNO_NRST_Pin GPIO_PIN_0
 #define BNO_NRST_GPIO_Port GPIOB
 #define BNO_WAKE_Pin GPIO_PIN_1
 #define BNO_WAKE_GPIO_Port GPIOB
+#define BNO_NBOOT_Pin GPIO_PIN_2
+#define BNO_NBOOT_GPIO_Port GPIOB
 #define add_PB11_Pin GPIO_PIN_11
 #define add_PB11_GPIO_Port GPIOB
 #define add_PB12_Pin GPIO_PIN_12

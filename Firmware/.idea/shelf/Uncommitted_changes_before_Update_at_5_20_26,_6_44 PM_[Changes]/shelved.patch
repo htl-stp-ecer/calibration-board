@@ -1,0 +1,878 @@
+Index: Core/Src/main.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/* USER CODE BEGIN Header */\r\n/**\r\n  ******************************************************************************\r\n  * @file           : main.c\r\n  * @brief          : Main program body\r\n  ******************************************************************************\r\n  * @attention\r\n  *\r\n  * Copyright (c) 2026 STMicroelectronics.\r\n  * All rights reserved.\r\n  *\r\n  * This software is licensed under terms that can be found in the LICENSE file\r\n  * in the root directory of this software component.\r\n  * If no LICENSE file comes with this software, it is provided AS-IS.\r\n  *\r\n  ******************************************************************************\r\n  */\r\n/* USER CODE END Header */\r\n/* Includes ------------------------------------------------------------------*/\r\n#include \"main.h\"\r\n\r\n/* Private includes ----------------------------------------------------------*/\r\n/* USER CODE BEGIN Includes */\r\n#include \"app.h\"\r\n/* USER CODE END Includes */\r\n\r\n/* Private typedef -----------------------------------------------------------*/\r\n/* USER CODE BEGIN PTD */\r\n\r\n/* USER CODE END PTD */\r\n\r\n/* Private define ------------------------------------------------------------*/\r\n/* USER CODE BEGIN PD */\r\n\r\n/* USER CODE END PD */\r\n\r\n/* Private macro -------------------------------------------------------------*/\r\n/* USER CODE BEGIN PM */\r\n\r\n/* USER CODE END PM */\r\n\r\n/* Private variables ---------------------------------------------------------*/\r\n\r\nSPI_HandleTypeDef hspi1;\r\nSPI_HandleTypeDef hspi2;\r\nSPI_HandleTypeDef hspi3;\r\n\r\nUART_HandleTypeDef huart4;\r\n\r\nPCD_HandleTypeDef hpcd_USB_OTG_FS;\r\n\r\n/* USER CODE BEGIN PV */\r\n\r\n/* USER CODE END PV */\r\n\r\n/* Private function prototypes -----------------------------------------------*/\r\nvoid SystemClock_Config(void);\r\nstatic void MPU_Config(void);\r\nstatic void MX_GPIO_Init(void);\r\nstatic void MX_SPI1_Init(void);\r\nstatic void MX_USB_OTG_FS_PCD_Init(void);\r\nstatic void MX_SPI3_Init(void);\r\nstatic void MX_SPI2_Init(void);\r\nstatic void MX_UART4_Init(void);\r\n/* USER CODE BEGIN PFP */\r\n\r\n/* USER CODE END PFP */\r\n\r\n/* Private user code ---------------------------------------------------------*/\r\n/* USER CODE BEGIN 0 */\r\n\r\n/* USER CODE END 0 */\r\n\r\n/**\r\n  * @brief  The application entry point.\r\n  * @retval int\r\n  */\r\nint main(void)\r\n{\r\n\r\n  /* USER CODE BEGIN 1 */\r\n\r\n\r\n  /* USER CODE END 1 */\r\n\r\n  /* MPU Configuration--------------------------------------------------------*/\r\n  MPU_Config();\r\n\r\n  /* MCU Configuration--------------------------------------------------------*/\r\n\r\n  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */\r\n  HAL_Init();\r\n\r\n  /* USER CODE BEGIN Init */\r\n\r\n  /* USER CODE END Init */\r\n\r\n  /* Configure the system clock */\r\n  SystemClock_Config();\r\n\r\n  /* USER CODE BEGIN SysInit */\r\n\r\n  /* USER CODE END SysInit */\r\n\r\n  /* Initialize all configured peripherals */\r\n  MX_GPIO_Init();\r\n  MX_SPI1_Init();\r\n  MX_USB_OTG_FS_PCD_Init();\r\n  MX_SPI3_Init();\r\n  MX_SPI2_Init();\r\n  MX_UART4_Init();\r\n  /* USER CODE BEGIN 2 */\r\n  HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);\r\n  app_main();\r\n  /* USER CODE END 2 */\r\n\r\n  /* Infinite loop */\r\n  /* USER CODE BEGIN WHILE */\r\n  while (1)\r\n  {\r\n    /* USER CODE END WHILE */\r\n\r\n    /* USER CODE BEGIN 3 */\r\n  }\r\n  /* USER CODE END 3 */\r\n}\r\n\r\n/**\r\n  * @brief System Clock Configuration\r\n  * @retval None\r\n  */\r\nvoid SystemClock_Config(void)\r\n{\r\n  RCC_OscInitTypeDef RCC_OscInitStruct = {0};\r\n  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};\r\n\r\n  /** Configure the main internal regulator output voltage\r\n  */\r\n  __HAL_RCC_PWR_CLK_ENABLE();\r\n  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);\r\n\r\n  /** Initializes the RCC Oscillators according to the specified parameters\r\n  * in the RCC_OscInitTypeDef structure.\r\n  */\r\n  /* HSI-Workaround: Y202 (12 MHz HSE-Quarz) schwingt am Board nicht an\r\n   * (HSERDY bleibt 0). Bis das Hardware-Problem behoben ist, läuft die PLL\r\n   * vom internen HSI (16 MHz). VCO-input muss 1–2 MHz sein, also PLLM=8.\r\n   * 16 MHz / 8 × 192 / 2 = 192 MHz SYSCLK → APB2 = 96 MHz (SPI1 /32 = 3 MHz).\r\n   * Beim nächsten CubeMX-Regenerate-Lauf muss das wieder auf HSE umgestellt\r\n   * werden, sobald der Quarz angeht. */\r\n  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;\r\n  RCC_OscInitStruct.HSIState = RCC_HSI_ON;\r\n  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;\r\n  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;\r\n  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;\r\n  RCC_OscInitStruct.PLL.PLLM = 8;\r\n  RCC_OscInitStruct.PLL.PLLN = 192;\r\n  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;\r\n  RCC_OscInitStruct.PLL.PLLQ = 8;\r\n  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n\r\n  /** Activate the Over-Drive mode\r\n  */\r\n  if (HAL_PWREx_EnableOverDrive() != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n\r\n  /** Initializes the CPU, AHB and APB buses clocks\r\n  */\r\n  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK\r\n                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;\r\n  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;\r\n  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;\r\n  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;\r\n  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;\r\n\r\n  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_6) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n}\r\n\r\n/**\r\n  * @brief SPI1 Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_SPI1_Init(void)\r\n{\r\n\r\n  /* USER CODE BEGIN SPI1_Init 0 */\r\n\r\n  /* USER CODE END SPI1_Init 0 */\r\n\r\n  /* USER CODE BEGIN SPI1_Init 1 */\r\n\r\n  /* USER CODE END SPI1_Init 1 */\r\n  /* SPI1 parameter configuration*/\r\n  hspi1.Instance = SPI1;\r\n  hspi1.Init.Mode = SPI_MODE_MASTER;\r\n  hspi1.Init.Direction = SPI_DIRECTION_2LINES;\r\n  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;\r\n  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;\r\n  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;\r\n  hspi1.Init.NSS = SPI_NSS_SOFT;\r\n  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;\r\n  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;\r\n  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;\r\n  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\r\n  hspi1.Init.CRCPolynomial = 7;\r\n  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;\r\n  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;\r\n  if (HAL_SPI_Init(&hspi1) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n  /* USER CODE BEGIN SPI1_Init 2 */\r\n\r\n  /* USER CODE END SPI1_Init 2 */\r\n\r\n}\r\n\r\n/**\r\n  * @brief SPI2 Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_SPI2_Init(void)\r\n{\r\n\r\n  /* USER CODE BEGIN SPI2_Init 0 */\r\n\r\n  /* USER CODE END SPI2_Init 0 */\r\n\r\n  /* USER CODE BEGIN SPI2_Init 1 */\r\n\r\n  /* USER CODE END SPI2_Init 1 */\r\n  /* SPI2 parameter configuration*/\r\n  hspi2.Instance = SPI2;\r\n  hspi2.Init.Mode = SPI_MODE_MASTER;\r\n  hspi2.Init.Direction = SPI_DIRECTION_2LINES;\r\n  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;\r\n  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;\r\n  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;\r\n  hspi2.Init.NSS = SPI_NSS_SOFT;\r\n  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;\r\n  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;\r\n  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;\r\n  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\r\n  hspi2.Init.CRCPolynomial = 7;\r\n  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;\r\n  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;\r\n  if (HAL_SPI_Init(&hspi2) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n  /* USER CODE BEGIN SPI2_Init 2 */\r\n\r\n  /* USER CODE END SPI2_Init 2 */\r\n\r\n}\r\n\r\n/**\r\n  * @brief SPI3 Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_SPI3_Init(void)\r\n{\r\n\r\n  /* USER CODE BEGIN SPI3_Init 0 */\r\n\r\n  /* USER CODE END SPI3_Init 0 */\r\n\r\n  /* USER CODE BEGIN SPI3_Init 1 */\r\n\r\n  /* USER CODE END SPI3_Init 1 */\r\n  /* SPI3 parameter configuration*/\r\n  hspi3.Instance = SPI3;\r\n  hspi3.Init.Mode = SPI_MODE_MASTER;\r\n  hspi3.Init.Direction = SPI_DIRECTION_2LINES;\r\n  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;\r\n  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;\r\n  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;\r\n  hspi3.Init.NSS = SPI_NSS_SOFT;\r\n  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;\r\n  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;\r\n  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;\r\n  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;\r\n  hspi3.Init.CRCPolynomial = 7;\r\n  hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;\r\n  hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;\r\n  if (HAL_SPI_Init(&hspi3) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n  /* USER CODE BEGIN SPI3_Init 2 */\r\n\r\n  /* USER CODE END SPI3_Init 2 */\r\n\r\n}\r\n\r\n/**\r\n  * @brief UART4 Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_UART4_Init(void)\r\n{\r\n\r\n  /* USER CODE BEGIN UART4_Init 0 */\r\n\r\n  /* USER CODE END UART4_Init 0 */\r\n\r\n  /* USER CODE BEGIN UART4_Init 1 */\r\n\r\n  /* USER CODE END UART4_Init 1 */\r\n  huart4.Instance = UART4;\r\n  huart4.Init.BaudRate = 115200;\r\n  huart4.Init.WordLength = UART_WORDLENGTH_8B;\r\n  huart4.Init.StopBits = UART_STOPBITS_1;\r\n  huart4.Init.Parity = UART_PARITY_NONE;\r\n  huart4.Init.Mode = UART_MODE_TX_RX;\r\n  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;\r\n  huart4.Init.OverSampling = UART_OVERSAMPLING_16;\r\n  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;\r\n  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;\r\n  if (HAL_UART_Init(&huart4) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n  /* USER CODE BEGIN UART4_Init 2 */\r\n\r\n  /* USER CODE END UART4_Init 2 */\r\n\r\n}\r\n\r\n/**\r\n  * @brief USB_OTG_FS Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_USB_OTG_FS_PCD_Init(void)\r\n{\r\n\r\n  /* USER CODE BEGIN USB_OTG_FS_Init 0 */\r\n\r\n  /* USER CODE END USB_OTG_FS_Init 0 */\r\n\r\n  /* USER CODE BEGIN USB_OTG_FS_Init 1 */\r\n\r\n  /* USER CODE END USB_OTG_FS_Init 1 */\r\n  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;\r\n  hpcd_USB_OTG_FS.Init.dev_endpoints = 6;\r\n  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;\r\n  hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;\r\n  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;\r\n  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;\r\n  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;\r\n  hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;\r\n  hpcd_USB_OTG_FS.Init.battery_charging_enable = ENABLE;\r\n  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;\r\n  hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;\r\n  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)\r\n  {\r\n    Error_Handler();\r\n  }\r\n  /* USER CODE BEGIN USB_OTG_FS_Init 2 */\r\n\r\n  /* USER CODE END USB_OTG_FS_Init 2 */\r\n\r\n}\r\n\r\n/**\r\n  * @brief GPIO Initialization Function\r\n  * @param None\r\n  * @retval None\r\n  */\r\nstatic void MX_GPIO_Init(void)\r\n{\r\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\r\n  /* USER CODE BEGIN MX_GPIO_Init_1 */\r\n\r\n  /* USER CODE END MX_GPIO_Init_1 */\r\n\r\n  /* GPIO Ports Clock Enable */\r\n  __HAL_RCC_GPIOC_CLK_ENABLE();\r\n  __HAL_RCC_GPIOH_CLK_ENABLE();\r\n  __HAL_RCC_GPIOA_CLK_ENABLE();\r\n  __HAL_RCC_GPIOB_CLK_ENABLE();\r\n  __HAL_RCC_GPIOD_CLK_ENABLE();\r\n\r\n  /*Configure GPIO pin Output Level */\r\n  HAL_GPIO_WritePin(GPIOA, FLOW_SENS_INT_Pin|FLOW_SENS_CS_Pin|BNO_CS1_Pin, GPIO_PIN_RESET);\r\n\r\n  /*Configure GPIO pin Output Level */\r\n  HAL_GPIO_WritePin(GPIOB, BNO_NRST_Pin|BNO_WAKE_Pin|GPIO_PIN_2|add_PB11_Pin\r\n                          |add_PB12_Pin|add_PB13_Pin|add_PB14_Pin|add_PB15_Pin, GPIO_PIN_RESET);\r\n\r\n  /*Configure GPIO pin Output Level */\r\n  HAL_GPIO_WritePin(GPIOC, add_PC6_Pin|add_PC7_Pin|add_PC8_Pin|USER_LED_Pin, GPIO_PIN_RESET);\r\n\r\n  /*Configure GPIO pin Output Level */\r\n  HAL_GPIO_WritePin(SPI3_CS1_GPIO_Port, SPI3_CS1_Pin, GPIO_PIN_RESET);\r\n\r\n  /*Configure GPIO pins : FLOW_SENS_INT_Pin FLOW_SENS_CS_Pin BNO_CS1_Pin */\r\n  GPIO_InitStruct.Pin = FLOW_SENS_INT_Pin|FLOW_SENS_CS_Pin|BNO_CS1_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\r\n  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\r\n\r\n  /*Configure GPIO pin : BNO_INT_Pin */\r\n  GPIO_InitStruct.Pin = BNO_INT_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  HAL_GPIO_Init(BNO_INT_GPIO_Port, &GPIO_InitStruct);\r\n\r\n  /*Configure GPIO pins : BNO_NRST_Pin BNO_WAKE_Pin PB2 add_PB11_Pin\r\n                           add_PB12_Pin add_PB13_Pin add_PB14_Pin add_PB15_Pin */\r\n  GPIO_InitStruct.Pin = BNO_NRST_Pin|BNO_WAKE_Pin|GPIO_PIN_2|add_PB11_Pin\r\n                          |add_PB12_Pin|add_PB13_Pin|add_PB14_Pin|add_PB15_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\r\n  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\r\n\r\n  /*Configure GPIO pins : add_PC6_Pin add_PC7_Pin add_PC8_Pin USER_LED_Pin */\r\n  GPIO_InitStruct.Pin = add_PC6_Pin|add_PC7_Pin|add_PC8_Pin|USER_LED_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\r\n  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);\r\n\r\n  /*Configure GPIO pin : ICM_INT_Pin */\r\n  GPIO_InitStruct.Pin = ICM_INT_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  HAL_GPIO_Init(ICM_INT_GPIO_Port, &GPIO_InitStruct);\r\n\r\n  /*Configure GPIO pin : SPI3_CS1_Pin */\r\n  GPIO_InitStruct.Pin = SPI3_CS1_Pin;\r\n  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;\r\n  GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;\r\n  HAL_GPIO_Init(SPI3_CS1_GPIO_Port, &GPIO_InitStruct);\r\n\r\n  /* USER CODE BEGIN MX_GPIO_Init_2 */\r\n\r\n  /* USER CODE END MX_GPIO_Init_2 */\r\n}\r\n\r\n/* USER CODE BEGIN 4 */\r\n\r\n/* USER CODE END 4 */\r\n\r\n /* MPU Configuration */\r\n\r\nvoid MPU_Config(void)\r\n{\r\n  MPU_Region_InitTypeDef MPU_InitStruct = {0};\r\n\r\n  /* Disables the MPU */\r\n  HAL_MPU_Disable();\r\n\r\n  /** Initializes and configures the Region and the memory to be protected\r\n  */\r\n  MPU_InitStruct.Enable = MPU_REGION_ENABLE;\r\n  MPU_InitStruct.Number = MPU_REGION_NUMBER0;\r\n  MPU_InitStruct.BaseAddress = 0x0;\r\n  MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;\r\n  MPU_InitStruct.SubRegionDisable = 0x87;\r\n  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;\r\n  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;\r\n  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;\r\n  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;\r\n  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;\r\n  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;\r\n\r\n  HAL_MPU_ConfigRegion(&MPU_InitStruct);\r\n  /* Enables the MPU */\r\n  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);\r\n\r\n}\r\n\r\n/**\r\n  * @brief  This function is executed in case of error occurrence.\r\n  * @retval None\r\n  */\r\nvoid Error_Handler(void)\r\n{\r\n  /* USER CODE BEGIN Error_Handler_Debug */\r\n  /* User can add his own implementation to report the HAL error return state */\r\n  __disable_irq();\r\n  while (1)\r\n  {\r\n  }\r\n  /* USER CODE END Error_Handler_Debug */\r\n}\r\n#ifdef USE_FULL_ASSERT\r\n/**\r\n  * @brief  Reports the name of the source file and the source line number\r\n  *         where the assert_param error has occurred.\r\n  * @param  file: pointer to the source file name\r\n  * @param  line: assert_param error line source number\r\n  * @retval None\r\n  */\r\nvoid assert_failed(uint8_t *file, uint32_t line)\r\n{\r\n  /* USER CODE BEGIN 6 */\r\n  /* User can add his own implementation to report the file name and line number,\r\n     ex: printf(\"Wrong parameters value: file %s on line %d\\r\\n\", file, line) */\r\n  /* USER CODE END 6 */\r\n}\r\n#endif /* USE_FULL_ASSERT */\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+--- a/Core/Src/main.c	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/Core/Src/main.c	(date 1779293835670)
+@@ -18,6 +18,10 @@
+ /* USER CODE END Header */
+ /* Includes ------------------------------------------------------------------*/
+ #include "main.h"
++#include "spi.h"
++#include "usart.h"
++#include "usb_otg.h"
++#include "gpio.h"
+ 
+ /* Private includes ----------------------------------------------------------*/
+ /* USER CODE BEGIN Includes */
+@@ -41,14 +45,6 @@
+ 
+ /* Private variables ---------------------------------------------------------*/
+ 
+-SPI_HandleTypeDef hspi1;
+-SPI_HandleTypeDef hspi2;
+-SPI_HandleTypeDef hspi3;
+-
+-UART_HandleTypeDef huart4;
+-
+-PCD_HandleTypeDef hpcd_USB_OTG_FS;
+-
+ /* USER CODE BEGIN PV */
+ 
+ /* USER CODE END PV */
+@@ -56,12 +52,6 @@
+ /* Private function prototypes -----------------------------------------------*/
+ void SystemClock_Config(void);
+ static void MPU_Config(void);
+-static void MX_GPIO_Init(void);
+-static void MX_SPI1_Init(void);
+-static void MX_USB_OTG_FS_PCD_Init(void);
+-static void MX_SPI3_Init(void);
+-static void MX_SPI2_Init(void);
+-static void MX_UART4_Init(void);
+ /* USER CODE BEGIN PFP */
+ 
+ /* USER CODE END PFP */
+@@ -142,18 +132,11 @@
+   /** Initializes the RCC Oscillators according to the specified parameters
+   * in the RCC_OscInitTypeDef structure.
+   */
+-  /* HSI-Workaround: Y202 (12 MHz HSE-Quarz) schwingt am Board nicht an
+-   * (HSERDY bleibt 0). Bis das Hardware-Problem behoben ist, läuft die PLL
+-   * vom internen HSI (16 MHz). VCO-input muss 1–2 MHz sein, also PLLM=8.
+-   * 16 MHz / 8 × 192 / 2 = 192 MHz SYSCLK → APB2 = 96 MHz (SPI1 /32 = 3 MHz).
+-   * Beim nächsten CubeMX-Regenerate-Lauf muss das wieder auf HSE umgestellt
+-   * werden, sobald der Quarz angeht. */
+-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
++  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
++  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+-  RCC_OscInitStruct.PLL.PLLM = 8;
++  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
++  RCC_OscInitStruct.PLL.PLLM = 6;
+   RCC_OscInitStruct.PLL.PLLN = 192;
+   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+   RCC_OscInitStruct.PLL.PLLQ = 8;
+@@ -183,276 +166,6 @@
+     Error_Handler();
+   }
+ }
+-
+-/**
+-  * @brief SPI1 Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_SPI1_Init(void)
+-{
+-
+-  /* USER CODE BEGIN SPI1_Init 0 */
+-
+-  /* USER CODE END SPI1_Init 0 */
+-
+-  /* USER CODE BEGIN SPI1_Init 1 */
+-
+-  /* USER CODE END SPI1_Init 1 */
+-  /* SPI1 parameter configuration*/
+-  hspi1.Instance = SPI1;
+-  hspi1.Init.Mode = SPI_MODE_MASTER;
+-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+-  hspi1.Init.NSS = SPI_NSS_SOFT;
+-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+-  hspi1.Init.CRCPolynomial = 7;
+-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+-  {
+-    Error_Handler();
+-  }
+-  /* USER CODE BEGIN SPI1_Init 2 */
+-
+-  /* USER CODE END SPI1_Init 2 */
+-
+-}
+-
+-/**
+-  * @brief SPI2 Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_SPI2_Init(void)
+-{
+-
+-  /* USER CODE BEGIN SPI2_Init 0 */
+-
+-  /* USER CODE END SPI2_Init 0 */
+-
+-  /* USER CODE BEGIN SPI2_Init 1 */
+-
+-  /* USER CODE END SPI2_Init 1 */
+-  /* SPI2 parameter configuration*/
+-  hspi2.Instance = SPI2;
+-  hspi2.Init.Mode = SPI_MODE_MASTER;
+-  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+-  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;
+-  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+-  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+-  hspi2.Init.NSS = SPI_NSS_SOFT;
+-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+-  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+-  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+-  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+-  hspi2.Init.CRCPolynomial = 7;
+-  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+-  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+-  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+-  {
+-    Error_Handler();
+-  }
+-  /* USER CODE BEGIN SPI2_Init 2 */
+-
+-  /* USER CODE END SPI2_Init 2 */
+-
+-}
+-
+-/**
+-  * @brief SPI3 Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_SPI3_Init(void)
+-{
+-
+-  /* USER CODE BEGIN SPI3_Init 0 */
+-
+-  /* USER CODE END SPI3_Init 0 */
+-
+-  /* USER CODE BEGIN SPI3_Init 1 */
+-
+-  /* USER CODE END SPI3_Init 1 */
+-  /* SPI3 parameter configuration*/
+-  hspi3.Instance = SPI3;
+-  hspi3.Init.Mode = SPI_MODE_MASTER;
+-  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+-  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;
+-  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
+-  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
+-  hspi3.Init.NSS = SPI_NSS_SOFT;
+-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+-  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+-  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
+-  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+-  hspi3.Init.CRCPolynomial = 7;
+-  hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+-  hspi3.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+-  if (HAL_SPI_Init(&hspi3) != HAL_OK)
+-  {
+-    Error_Handler();
+-  }
+-  /* USER CODE BEGIN SPI3_Init 2 */
+-
+-  /* USER CODE END SPI3_Init 2 */
+-
+-}
+-
+-/**
+-  * @brief UART4 Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_UART4_Init(void)
+-{
+-
+-  /* USER CODE BEGIN UART4_Init 0 */
+-
+-  /* USER CODE END UART4_Init 0 */
+-
+-  /* USER CODE BEGIN UART4_Init 1 */
+-
+-  /* USER CODE END UART4_Init 1 */
+-  huart4.Instance = UART4;
+-  huart4.Init.BaudRate = 115200;
+-  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+-  huart4.Init.StopBits = UART_STOPBITS_1;
+-  huart4.Init.Parity = UART_PARITY_NONE;
+-  huart4.Init.Mode = UART_MODE_TX_RX;
+-  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+-  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+-  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+-  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+-  if (HAL_UART_Init(&huart4) != HAL_OK)
+-  {
+-    Error_Handler();
+-  }
+-  /* USER CODE BEGIN UART4_Init 2 */
+-
+-  /* USER CODE END UART4_Init 2 */
+-
+-}
+-
+-/**
+-  * @brief USB_OTG_FS Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_USB_OTG_FS_PCD_Init(void)
+-{
+-
+-  /* USER CODE BEGIN USB_OTG_FS_Init 0 */
+-
+-  /* USER CODE END USB_OTG_FS_Init 0 */
+-
+-  /* USER CODE BEGIN USB_OTG_FS_Init 1 */
+-
+-  /* USER CODE END USB_OTG_FS_Init 1 */
+-  hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
+-  hpcd_USB_OTG_FS.Init.dev_endpoints = 6;
+-  hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
+-  hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;
+-  hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+-  hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
+-  hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
+-  hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
+-  hpcd_USB_OTG_FS.Init.battery_charging_enable = ENABLE;
+-  hpcd_USB_OTG_FS.Init.vbus_sensing_enable = ENABLE;
+-  hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
+-  if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
+-  {
+-    Error_Handler();
+-  }
+-  /* USER CODE BEGIN USB_OTG_FS_Init 2 */
+-
+-  /* USER CODE END USB_OTG_FS_Init 2 */
+-
+-}
+-
+-/**
+-  * @brief GPIO Initialization Function
+-  * @param None
+-  * @retval None
+-  */
+-static void MX_GPIO_Init(void)
+-{
+-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+-  /* USER CODE BEGIN MX_GPIO_Init_1 */
+-
+-  /* USER CODE END MX_GPIO_Init_1 */
+-
+-  /* GPIO Ports Clock Enable */
+-  __HAL_RCC_GPIOC_CLK_ENABLE();
+-  __HAL_RCC_GPIOH_CLK_ENABLE();
+-  __HAL_RCC_GPIOA_CLK_ENABLE();
+-  __HAL_RCC_GPIOB_CLK_ENABLE();
+-  __HAL_RCC_GPIOD_CLK_ENABLE();
+-
+-  /*Configure GPIO pin Output Level */
+-  HAL_GPIO_WritePin(GPIOA, FLOW_SENS_INT_Pin|FLOW_SENS_CS_Pin|BNO_CS1_Pin, GPIO_PIN_RESET);
+-
+-  /*Configure GPIO pin Output Level */
+-  HAL_GPIO_WritePin(GPIOB, BNO_NRST_Pin|BNO_WAKE_Pin|GPIO_PIN_2|add_PB11_Pin
+-                          |add_PB12_Pin|add_PB13_Pin|add_PB14_Pin|add_PB15_Pin, GPIO_PIN_RESET);
+-
+-  /*Configure GPIO pin Output Level */
+-  HAL_GPIO_WritePin(GPIOC, add_PC6_Pin|add_PC7_Pin|add_PC8_Pin|USER_LED_Pin, GPIO_PIN_RESET);
+-
+-  /*Configure GPIO pin Output Level */
+-  HAL_GPIO_WritePin(SPI3_CS1_GPIO_Port, SPI3_CS1_Pin, GPIO_PIN_RESET);
+-
+-  /*Configure GPIO pins : FLOW_SENS_INT_Pin FLOW_SENS_CS_Pin BNO_CS1_Pin */
+-  GPIO_InitStruct.Pin = FLOW_SENS_INT_Pin|FLOW_SENS_CS_Pin|BNO_CS1_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+-
+-  /*Configure GPIO pin : BNO_INT_Pin */
+-  GPIO_InitStruct.Pin = BNO_INT_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  HAL_GPIO_Init(BNO_INT_GPIO_Port, &GPIO_InitStruct);
+-
+-  /*Configure GPIO pins : BNO_NRST_Pin BNO_WAKE_Pin PB2 add_PB11_Pin
+-                           add_PB12_Pin add_PB13_Pin add_PB14_Pin add_PB15_Pin */
+-  GPIO_InitStruct.Pin = BNO_NRST_Pin|BNO_WAKE_Pin|GPIO_PIN_2|add_PB11_Pin
+-                          |add_PB12_Pin|add_PB13_Pin|add_PB14_Pin|add_PB15_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+-
+-  /*Configure GPIO pins : add_PC6_Pin add_PC7_Pin add_PC8_Pin USER_LED_Pin */
+-  GPIO_InitStruct.Pin = add_PC6_Pin|add_PC7_Pin|add_PC8_Pin|USER_LED_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+-
+-  /*Configure GPIO pin : ICM_INT_Pin */
+-  GPIO_InitStruct.Pin = ICM_INT_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  HAL_GPIO_Init(ICM_INT_GPIO_Port, &GPIO_InitStruct);
+-
+-  /*Configure GPIO pin : SPI3_CS1_Pin */
+-  GPIO_InitStruct.Pin = SPI3_CS1_Pin;
+-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+-  HAL_GPIO_Init(SPI3_CS1_GPIO_Port, &GPIO_InitStruct);
+-
+-  /* USER CODE BEGIN MX_GPIO_Init_2 */
+-
+-  /* USER CODE END MX_GPIO_Init_2 */
+-}
+ 
+ /* USER CODE BEGIN 4 */
+ 
+Index: .idea/.gitignore
+===================================================================
+diff --git a/.idea/.gitignore b/.idea/.gitignore
+deleted file mode 100644
+--- a/.idea/.gitignore	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ /dev/null	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
+@@ -1,10 +0,0 @@
+-# Default ignored files
+-/shelf/
+-/workspace.xml
+-# Ignored default folder with query files
+-/queries/
+-# Datasource local storage ignored files
+-/dataSources/
+-/dataSources.local.xml
+-# Editor-based HTTP Client requests
+-/httpRequests/
+Index: .idea/debugServers/Config.xml
+===================================================================
+diff --git a/.idea/debugServers/Config.xml b/.idea/debugServers/Config.xml
+deleted file mode 100644
+--- a/.idea/debugServers/Config.xml	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ /dev/null	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
+@@ -1,3 +0,0 @@
+-<component name="DebugServers">
+-  <config name="Config" force-enabled="true" />
+-</component>
+\ No newline at end of file
+Index: .idea/debugServers/ST_LINK.xml
+===================================================================
+diff --git a/.idea/debugServers/ST_LINK.xml b/.idea/debugServers/ST_LINK.xml
+deleted file mode 100644
+--- a/.idea/debugServers/ST_LINK.xml	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ /dev/null	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
+@@ -1,13 +0,0 @@
+-<component name="DebugServers">
+-  <stlink-debug-target name="ST-LINK" uniqueID="38057ec4-2d20-442d-a610-1e444aef6fa8" selected="true">
+-    <debugger version="1">
+-      <debugger kind="GDB" isBundled="true" />
+-      <env />
+-    </debugger>
+-    <gdbserver exe="/opt/st/stm32cubeclt_1.21.0/STLink-gdb-server/bin/ST-LINK_gdbserver" programmer="/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin" />
+-    <st-link />
+-    <device interface="SWD" />
+-    <connection extended-remote="false" port="61234" warmup-ms="500" />
+-    <swo enabled="false" port="61235" />
+-  </stlink-debug-target>
+-</component>
+\ No newline at end of file
+Index: .mxproject
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>[PreviousLibFiles]\r\nLibFiles=Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_bus.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_system.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_utils.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dmamux.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_def.h;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_bus.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_system.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_utils.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dmamux.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_def.h;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/stm32f722xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/system_stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/system_stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Drivers/CMSIS/Include/core_cm23.h;Drivers/CMSIS/Include/core_sc000.h;Drivers/CMSIS/Include/core_armv8mbl.h;Drivers/CMSIS/Include/cmsis_iccarm.h;Drivers/CMSIS/Include/mpu_armv7.h;Drivers/CMSIS/Include/core_cm33.h;Drivers/CMSIS/Include/core_cm0plus.h;Drivers/CMSIS/Include/cmsis_gcc.h;Drivers/CMSIS/Include/core_cm7.h;Drivers/CMSIS/Include/cmsis_version.h;Drivers/CMSIS/Include/core_cm0.h;Drivers/CMSIS/Include/core_cm4.h;Drivers/CMSIS/Include/core_armv8mml.h;Drivers/CMSIS/Include/core_cm1.h;Drivers/CMSIS/Include/mpu_armv8.h;Drivers/CMSIS/Include/core_sc300.h;Drivers/CMSIS/Include/core_cm3.h;Drivers/CMSIS/Include/cmsis_armcc.h;Drivers/CMSIS/Include/cmsis_compiler.h;Drivers/CMSIS/Include/cmsis_armclang.h;Drivers/CMSIS/Include/tz_context.h;\r\n\r\n[PreviousUsedCMakes]\r\nSourceFiles=Core/Src/main.c;Core/Src/stm32f7xx_it.c;Core/Src/stm32f7xx_hal_msp.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;;;\r\nHeaderPath=Drivers/STM32F7xx_HAL_Driver/Inc;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;Drivers/CMSIS/Device/ST/STM32F7xx/Include;Drivers/CMSIS/Include;Core/Inc;\r\nCDefines=USE_HAL_DRIVER;STM32F722xx;USE_HAL_DRIVER;USE_HAL_DRIVER;\r\n\r\n[PreviousGenFiles]\r\nAdvancedFolderStructure=true\r\nHeaderFileListSize=3\r\nHeaderFiles#0=../Core/Inc/stm32f7xx_it.h\r\nHeaderFiles#1=../Core/Inc/stm32f7xx_hal_conf.h\r\nHeaderFiles#2=../Core/Inc/main.h\r\nHeaderFolderListSize=1\r\nHeaderPath#0=../Core/Inc\r\nHeaderFiles=;\r\nSourceFileListSize=3\r\nSourceFiles#0=../Core/Src/stm32f7xx_it.c\r\nSourceFiles#1=../Core/Src/stm32f7xx_hal_msp.c\r\nSourceFiles#2=../Core/Src/main.c\r\nSourceFolderListSize=1\r\nSourcePath#0=../Core/Src\r\nSourceFiles=;\r\n\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.mxproject b/.mxproject
+--- a/.mxproject	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/.mxproject	(date 1779293836359)
+@@ -2,23 +2,31 @@
+ LibFiles=Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_bus.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_system.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_utils.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dmamux.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_def.h;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_cortex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_spi.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_spi_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_rcc_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_bus.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_rcc.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_system.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_utils.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_flash_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_gpio_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_gpio.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_dma_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dma.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_dmamux.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pwr_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_pwr.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_def.h;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_i2c_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_exti.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usart.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_pcd_ex.h;Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/stm32f722xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/system_stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Include/system_stm32f7xx.h;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Drivers/CMSIS/Include/core_cm23.h;Drivers/CMSIS/Include/core_sc000.h;Drivers/CMSIS/Include/core_armv8mbl.h;Drivers/CMSIS/Include/cmsis_iccarm.h;Drivers/CMSIS/Include/mpu_armv7.h;Drivers/CMSIS/Include/core_cm33.h;Drivers/CMSIS/Include/core_cm0plus.h;Drivers/CMSIS/Include/cmsis_gcc.h;Drivers/CMSIS/Include/core_cm7.h;Drivers/CMSIS/Include/cmsis_version.h;Drivers/CMSIS/Include/core_cm0.h;Drivers/CMSIS/Include/core_cm4.h;Drivers/CMSIS/Include/core_armv8mml.h;Drivers/CMSIS/Include/core_cm1.h;Drivers/CMSIS/Include/mpu_armv8.h;Drivers/CMSIS/Include/core_sc300.h;Drivers/CMSIS/Include/core_cm3.h;Drivers/CMSIS/Include/cmsis_armcc.h;Drivers/CMSIS/Include/cmsis_compiler.h;Drivers/CMSIS/Include/cmsis_armclang.h;Drivers/CMSIS/Include/tz_context.h;
+ 
+ [PreviousUsedCMakes]
+-SourceFiles=Core/Src/main.c;Core/Src/stm32f7xx_it.c;Core/Src/stm32f7xx_hal_msp.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;;;
++SourceFiles=Core/Src/main.c;Core/Src/gpio.c;Core/Src/spi.c;Core/Src/usart.c;Core/Src/usb_otg.c;Core/Src/stm32f7xx_it.c;Core/Src/stm32f7xx_hal_msp.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c;Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c;Drivers/CMSIS/Device/ST/STM32F7xx/Source/Templates/system_stm32f7xx.c;Core/Src/system_stm32f7xx.c;;;
+ HeaderPath=Drivers/STM32F7xx_HAL_Driver/Inc;Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;Drivers/CMSIS/Device/ST/STM32F7xx/Include;Drivers/CMSIS/Include;Core/Inc;
+ CDefines=USE_HAL_DRIVER;STM32F722xx;USE_HAL_DRIVER;USE_HAL_DRIVER;
+ 
+ [PreviousGenFiles]
+ AdvancedFolderStructure=true
+-HeaderFileListSize=3
+-HeaderFiles#0=../Core/Inc/stm32f7xx_it.h
+-HeaderFiles#1=../Core/Inc/stm32f7xx_hal_conf.h
+-HeaderFiles#2=../Core/Inc/main.h
++HeaderFileListSize=7
++HeaderFiles#0=../Core/Inc/gpio.h
++HeaderFiles#1=../Core/Inc/spi.h
++HeaderFiles#2=../Core/Inc/usart.h
++HeaderFiles#3=../Core/Inc/usb_otg.h
++HeaderFiles#4=../Core/Inc/stm32f7xx_it.h
++HeaderFiles#5=../Core/Inc/stm32f7xx_hal_conf.h
++HeaderFiles#6=../Core/Inc/main.h
+ HeaderFolderListSize=1
+ HeaderPath#0=../Core/Inc
+ HeaderFiles=;
+-SourceFileListSize=3
+-SourceFiles#0=../Core/Src/stm32f7xx_it.c
+-SourceFiles#1=../Core/Src/stm32f7xx_hal_msp.c
+-SourceFiles#2=../Core/Src/main.c
++SourceFileListSize=7
++SourceFiles#0=../Core/Src/gpio.c
++SourceFiles#1=../Core/Src/spi.c
++SourceFiles#2=../Core/Src/usart.c
++SourceFiles#3=../Core/Src/usb_otg.c
++SourceFiles#4=../Core/Src/stm32f7xx_it.c
++SourceFiles#5=../Core/Src/stm32f7xx_hal_msp.c
++SourceFiles#6=../Core/Src/main.c
+ SourceFolderListSize=1
+ SourcePath#0=../Core/Src
+ SourceFiles=;
+Index: Firmware.ioc
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#MicroXplorer Configuration settings - do not modify\nCAD.formats=[]\nCAD.pinconfig=Dual\nCAD.provider=Component Search Engine\nCORTEX_M7.IPParameters=default_mode_Activation\nCORTEX_M7.default_mode_Activation=1\nFile.Version=6\nGPIO.groupedBy=\nKeepUserPlacement=false\nMcu.CPN=STM32F722RET6\nMcu.Family=STM32F7\nMcu.IP0=CORTEX_M7\nMcu.IP1=NVIC\nMcu.IP2=RCC\nMcu.IP3=SPI1\nMcu.IP4=SPI2\nMcu.IP5=SPI3\nMcu.IP6=SYS\nMcu.IP7=UART4\nMcu.IP8=USB_OTG_FS\nMcu.IPNb=9\nMcu.Name=STM32F722R(C-E)Tx\nMcu.Package=LQFP64\nMcu.Pin0=PC14-OSC32_IN\nMcu.Pin1=PC15-OSC32_OUT\nMcu.Pin10=PA4\nMcu.Pin11=PA5\nMcu.Pin12=PA6\nMcu.Pin13=PA7\nMcu.Pin14=PC4\nMcu.Pin15=PB0\nMcu.Pin16=PB1\nMcu.Pin17=PB2\nMcu.Pin18=PB10\nMcu.Pin19=PB11\nMcu.Pin2=PH0-OSC_IN\nMcu.Pin20=PB12\nMcu.Pin21=PB13\nMcu.Pin22=PB14\nMcu.Pin23=PB15\nMcu.Pin24=PC6\nMcu.Pin25=PC7\nMcu.Pin26=PC8\nMcu.Pin27=PC9\nMcu.Pin28=PA9\nMcu.Pin29=PA11\nMcu.Pin3=PH1-OSC_OUT\nMcu.Pin30=PA12\nMcu.Pin31=PA13\nMcu.Pin32=PA14\nMcu.Pin33=PA15\nMcu.Pin34=PC10\nMcu.Pin35=PC11\nMcu.Pin36=PC12\nMcu.Pin37=PD2\nMcu.Pin38=PB3\nMcu.Pin39=VP_SYS_VS_Systick\nMcu.Pin4=PC2\nMcu.Pin5=PC3\nMcu.Pin6=PA0-WKUP\nMcu.Pin7=PA1\nMcu.Pin8=PA2\nMcu.Pin9=PA3\nMcu.PinsNb=40\nMcu.ThirdPartyNb=0\nMcu.UserConstants=\nMcu.UserName=STM32F722RETx\nMxCube.Version=6.17.0\nMxDb.Version=DB.6.0.170\nNVIC.BusFault_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.DebugMonitor_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.ForceEnableDMAVector=true\nNVIC.HardFault_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.MemoryManagement_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.NonMaskableInt_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.PendSV_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.PriorityGroup=NVIC_PRIORITYGROUP_4\nNVIC.SVCall_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nNVIC.SysTick_IRQn=true\\:15\\:0\\:false\\:false\\:true\\:false\\:true\\:false\nNVIC.UsageFault_IRQn=true\\:0\\:0\\:false\\:false\\:true\\:false\\:false\\:false\nPA0-WKUP.Mode=Asynchronous\nPA0-WKUP.Signal=UART4_TX\nPA1.Mode=Asynchronous\nPA1.Signal=UART4_RX\nPA11.Mode=Device_Only\nPA11.Signal=USB_OTG_FS_DM\nPA12.Mode=Device_Only\nPA12.Signal=USB_OTG_FS_DP\nPA13.Mode=Trace_Asynchronous_SW\nPA13.Signal=SYS_JTMS-SWDIO\nPA14.Mode=Trace_Asynchronous_SW\nPA14.Signal=SYS_JTCK-SWCLK\nPA15.GPIOParameters=GPIO_Label\nPA15.GPIO_Label=ICM_INT\nPA15.Locked=true\nPA15.Signal=GPXTI15\nPA2.GPIOParameters=GPIO_Label\nPA2.GPIO_Label=FLOW_SENS_INT\nPA2.Locked=true\nPA2.Signal=GPIO_Output\nPA3.GPIOParameters=GPIO_Label\nPA3.GPIO_Label=FLOW_SENS_CS\nPA3.Locked=true\nPA3.Signal=GPIO_Output\nPA4.GPIOParameters=GPIO_Label\nPA4.GPIO_Label=BNO_CS1\nPA4.Locked=true\nPA4.Signal=GPIO_Output\nPA5.GPIOParameters=GPIO_Label\nPA5.GPIO_Label=BNO_SCLK\nPA5.Mode=Full_Duplex_Master\nPA5.Signal=SPI1_SCK\nPA6.GPIOParameters=GPIO_Label\nPA6.GPIO_Label=BNO_MISO\nPA6.Mode=Full_Duplex_Master\nPA6.Signal=SPI1_MISO\nPA7.GPIOParameters=GPIO_Label\nPA7.GPIO_Label=BNO_MOSI\nPA7.Mode=Full_Duplex_Master\nPA7.Signal=SPI1_MOSI\nPA9.Mode=Activate_VBUS\nPA9.Signal=USB_OTG_FS_VBUS\nPB0.GPIOParameters=GPIO_Label\nPB0.GPIO_Label=BNO_NRST\nPB0.Locked=true\nPB0.Signal=GPIO_Output\nPB1.GPIOParameters=GPIO_Label\nPB1.GPIO_Label=BNO_WAKE\nPB1.Locked=true\nPB1.Signal=GPIO_Output\nPB10.Locked=true\nPB10.Mode=Full_Duplex_Master\nPB10.Signal=SPI2_SCK\nPB11.GPIOParameters=GPIO_Label\nPB11.GPIO_Label=add_PB11\nPB11.Locked=true\nPB11.Signal=GPIO_Output\nPB12.GPIOParameters=GPIO_Label\nPB12.GPIO_Label=add_PB12\nPB12.Locked=true\nPB12.Signal=GPIO_Output\nPB13.GPIOParameters=GPIO_Label\nPB13.GPIO_Label=add_PB13\nPB13.Locked=true\nPB13.Signal=GPIO_Output\nPB14.GPIOParameters=GPIO_Label\nPB14.GPIO_Label=add_PB14\nPB14.Locked=true\nPB14.Signal=GPIO_Output\nPB15.GPIOParameters=GPIO_Label\nPB15.GPIO_Label=add_PB15\nPB15.Locked=true\nPB15.Signal=GPIO_Output\nPB2.Locked=true\nPB2.Signal=GPIO_Output\nPB3.Mode=Trace_Asynchronous_SW\nPB3.Signal=SYS_JTDO-SWO\nPC10.Mode=Full_Duplex_Master\nPC10.Signal=SPI3_SCK\nPC11.Mode=Full_Duplex_Master\nPC11.Signal=SPI3_MISO\nPC12.Mode=Full_Duplex_Master\nPC12.Signal=SPI3_MOSI\nPC14-OSC32_IN.Mode=LSE-External-Clock-Source\nPC14-OSC32_IN.Signal=RCC_OSC32_IN\nPC15-OSC32_OUT.Mode=LSE-External-Clock-Source\nPC15-OSC32_OUT.Signal=RCC_OSC32_OUT\nPC2.Mode=Full_Duplex_Master\nPC2.Signal=SPI2_MISO\nPC3.Mode=Full_Duplex_Master\nPC3.Signal=SPI2_MOSI\nPC4.GPIOParameters=GPIO_Label\nPC4.GPIO_Label=BNO_INT\nPC4.Locked=true\nPC4.Signal=GPXTI4\nPC6.GPIOParameters=GPIO_Label\nPC6.GPIO_Label=add_PC6\nPC6.Locked=true\nPC6.Signal=GPIO_Output\nPC7.GPIOParameters=GPIO_Label\nPC7.GPIO_Label=add_PC7\nPC7.Locked=true\nPC7.Signal=GPIO_Output\nPC8.GPIOParameters=GPIO_Label\nPC8.GPIO_Label=add_PC8\nPC8.Locked=true\nPC8.Signal=GPIO_Output\nPC9.GPIOParameters=GPIO_Label\nPC9.GPIO_Label=USER_LED\nPC9.Locked=true\nPC9.Signal=GPIO_Output\nPCC.Checker=false\nPCC.Display=Plot\\: All Steps\nPCC.Line=STM32F7x2\nPCC.MCU=STM32F722R(C-E)Tx\nPCC.PartNumber=STM32F722RETx\nPCC.Series=STM32F7\nPCC.Temperature=25\nPCC.Vdd=3.3\nPD2.GPIOParameters=GPIO_Label\nPD2.GPIO_Label=SPI3_CS1\nPD2.Locked=true\nPD2.Signal=GPIO_Output\nPH0-OSC_IN.Mode=HSE-External-Oscillator\nPH0-OSC_IN.Signal=RCC_OSC_IN\nPH1-OSC_OUT.Mode=HSE-External-Oscillator\nPH1-OSC_OUT.Signal=RCC_OSC_OUT\nPinOutPanel.RotationAngle=0\nProjectManager.AskForMigrate=true\nProjectManager.BackupPrevious=false\nProjectManager.CompilerLinker=GCC\nProjectManager.CompilerOptimize=6\nProjectManager.ComputerToolchain=false\nProjectManager.CoupleFile=false\nProjectManager.CustomerFirmwarePackage=\nProjectManager.DefaultFWLocation=true\nProjectManager.DeletePrevious=true\nProjectManager.DeviceId=STM32F722RETx\nProjectManager.FirmwarePackage=STM32Cube FW_F7 V1.17.4\nProjectManager.FreePins=false\nProjectManager.FreePinsContext=\nProjectManager.HalAssertFull=false\nProjectManager.HeapSize=0x200\nProjectManager.KeepUserCode=true\nProjectManager.LastFirmware=true\nProjectManager.LibraryCopy=1\nProjectManager.MainLocation=Core/Src\nProjectManager.NoMain=false\nProjectManager.PreviousToolchain=\nProjectManager.ProjectBuild=false\nProjectManager.ProjectFileName=Firmware.ioc\nProjectManager.ProjectName=Firmware\nProjectManager.ProjectStructure=\nProjectManager.RegisterCallBack=\nProjectManager.StackSize=0x400\nProjectManager.TargetToolchain=CMake\nProjectManager.ToolChainLocation=\nProjectManager.UAScriptAfterPath=\nProjectManager.UAScriptBeforePath=\nProjectManager.UnderRoot=false\nProjectManager.functionlistsort=1-SystemClock_Config-RCC-false-HAL-false,2-MX_GPIO_Init-GPIO-false-HAL-true,3-MX_SPI1_Init-SPI1-false-HAL-true,4-MX_USB_OTG_FS_PCD_Init-USB_OTG_FS-false-HAL-true,5-MX_SPI3_Init-SPI3-false-HAL-true,6-MX_SPI2_Init-SPI2-false-HAL-true,7-MX_UART4_Init-UART4-false-HAL-true,0-MX_CORTEX_M7_Init-CORTEX_M7-false-HAL-true\nRCC.AHBFreq_Value=192000000\nRCC.APB1CLKDivider=RCC_HCLK_DIV4\nRCC.APB1Freq_Value=48000000\nRCC.APB1TimFreq_Value=96000000\nRCC.APB2CLKDivider=RCC_HCLK_DIV2\nRCC.APB2Freq_Value=96000000\nRCC.APB2TimFreq_Value=192000000\nRCC.CortexFreq_Value=192000000\nRCC.FCLKCortexFreq_Value=192000000\nRCC.FamilyName=M\nRCC.HCLKFreq_Value=192000000\nRCC.HSE_VALUE=12000000\nRCC.HSI_VALUE=16000000\nRCC.I2C1Freq_Value=48000000\nRCC.I2C2Freq_Value=48000000\nRCC.I2C3Freq_Value=48000000\nRCC.I2SFreq_Value=192000000\nRCC.IPParameters=AHBFreq_Value,APB1CLKDivider,APB1Freq_Value,APB1TimFreq_Value,APB2CLKDivider,APB2Freq_Value,APB2TimFreq_Value,CortexFreq_Value,FCLKCortexFreq_Value,FamilyName,HCLKFreq_Value,HSE_VALUE,HSI_VALUE,I2C1Freq_Value,I2C2Freq_Value,I2C3Freq_Value,I2SFreq_Value,LSE_VALUE,LSI_VALUE,MCO2PinFreq_Value,PLLCLKFreq_Value,PLLI2SQCLKFreq_Value,PLLI2SRCLKFreq_Value,PLLI2SRoutputFreq_Value,PLLM,PLLQ,PLLQCLKFreq_Value,PLLQoutputFreq_Value,PLLSAIPCLKFreq_Value,PLLSAIQCLKFreq_Value,PLLSAIoutputFreq_Value,RNGFreq_Value,SAI1Freq_Value,SAI2Freq_Value,SDMMCFreq_Value,SYSCLKFreq_VALUE,SYSCLKSource,UART4Freq_Value,UART5Freq_Value,USART1Freq_Value,USART2Freq_Value,USART3Freq_Value,USART6Freq_Value,USBFreq_Value,VCOI2SOutputFreq_Value,VCOInputFreq_Value,VCOOutputFreq_Value,VCOSAIOutputFreq_Value\nRCC.LSE_VALUE=32768\nRCC.LSI_VALUE=32000\nRCC.MCO2PinFreq_Value=192000000\nRCC.PLLCLKFreq_Value=192000000\nRCC.PLLI2SQCLKFreq_Value=192000000\nRCC.PLLI2SRCLKFreq_Value=192000000\nRCC.PLLI2SRoutputFreq_Value=192000000\nRCC.PLLM=6\nRCC.PLLQ=8\nRCC.PLLQCLKFreq_Value=48000000\nRCC.PLLQoutputFreq_Value=48000000\nRCC.PLLSAIPCLKFreq_Value=192000000\nRCC.PLLSAIQCLKFreq_Value=192000000\nRCC.PLLSAIoutputFreq_Value=192000000\nRCC.RNGFreq_Value=48000000\nRCC.SAI1Freq_Value=192000000\nRCC.SAI2Freq_Value=192000000\nRCC.SDMMCFreq_Value=192000000\nRCC.SYSCLKFreq_VALUE=192000000\nRCC.SYSCLKSource=RCC_SYSCLKSOURCE_PLLCLK\nRCC.UART4Freq_Value=48000000\nRCC.UART5Freq_Value=48000000\nRCC.USART1Freq_Value=96000000\nRCC.USART2Freq_Value=48000000\nRCC.USART3Freq_Value=48000000\nRCC.USART6Freq_Value=96000000\nRCC.USBFreq_Value=48000000\nRCC.VCOI2SOutputFreq_Value=384000000\nRCC.VCOInputFreq_Value=2000000\nRCC.VCOOutputFreq_Value=384000000\nRCC.VCOSAIOutputFreq_Value=384000000\nSH.GPXTI15.0=GPIO_EXTI15\nSH.GPXTI15.ConfNb=1\nSH.GPXTI4.0=GPIO_EXTI4\nSH.GPXTI4.ConfNb=1\nSPI1.BaudRatePrescaler=SPI_BAUDRATEPRESCALER_4\nSPI1.CalculateBaudRate=24.0 MBits/s\nSPI1.DataSize=SPI_DATASIZE_8BIT\nSPI1.Direction=SPI_DIRECTION_2LINES\nSPI1.IPParameters=VirtualType,Mode,Direction,CalculateBaudRate,DataSize,BaudRatePrescaler\nSPI1.Mode=SPI_MODE_MASTER\nSPI1.VirtualType=VM_MASTER\nSPI2.CalculateBaudRate=24.0 MBits/s\nSPI2.Direction=SPI_DIRECTION_2LINES\nSPI2.IPParameters=VirtualType,Mode,Direction,CalculateBaudRate\nSPI2.Mode=SPI_MODE_MASTER\nSPI2.VirtualType=VM_MASTER\nSPI3.CalculateBaudRate=24.0 MBits/s\nSPI3.Direction=SPI_DIRECTION_2LINES\nSPI3.IPParameters=VirtualType,Mode,Direction,CalculateBaudRate\nSPI3.Mode=SPI_MODE_MASTER\nSPI3.VirtualType=VM_MASTER\nUSB_OTG_FS.IPParameters=VirtualMode\nUSB_OTG_FS.VirtualMode=Device_Only\nVP_SYS_VS_Systick.Mode=SysTick\nVP_SYS_VS_Systick.Signal=SYS_VS_Systick\nboard=custom\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>US-ASCII
+===================================================================
+diff --git a/Firmware.ioc b/Firmware.ioc
+--- a/Firmware.ioc	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/Firmware.ioc	(date 1779293834187)
+@@ -211,7 +211,7 @@
+ ProjectManager.CompilerLinker=GCC
+ ProjectManager.CompilerOptimize=6
+ ProjectManager.ComputerToolchain=false
+-ProjectManager.CoupleFile=false
++ProjectManager.CoupleFile=true
+ ProjectManager.CustomerFirmwarePackage=
+ ProjectManager.DefaultFWLocation=true
+ ProjectManager.DeletePrevious=true
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project version=\"4\">\n  <component name=\"VcsDirectoryMappings\">\n    <mapping directory=\"$PROJECT_DIR$/..\" vcs=\"Git\" />\n  </component>\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+--- a/.idea/vcs.xml	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/.idea/vcs.xml	(date 1779291869400)
+@@ -2,5 +2,6 @@
+ <project version="4">
+   <component name="VcsDirectoryMappings">
+     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
++    <mapping directory="$PROJECT_DIR$/lib/sh2" vcs="Git" />
+   </component>
+ </project>
+\ No newline at end of file
+Index: scripts/_common.sh
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>#!/usr/bin/env bash\n# Sourced by the other scripts. Defines paths and common helpers.\nset -euo pipefail\n\nSCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nFIRMWARE_DIR=\"$(cd \"$SCRIPT_DIR/..\" && pwd)\"\n\nBUILD_TYPE=\"${BUILD_TYPE:-Debug}\"\nBUILD_DIR=\"$FIRMWARE_DIR/build/$BUILD_TYPE\"\nELF=\"$BUILD_DIR/Firmware.elf\"\n\nSWD_FREQ_KHZ=\"${SWD_FREQ_KHZ:-4000}\"\nGDB_PORT=\"${GDB_PORT:-61234}\"\n\nPROG_CLI=\"${PROG_CLI:-STM32_Programmer_CLI}\"\nGDB_SERVER=\"${GDB_SERVER:-ST-LINK_gdbserver}\"\nGDB=\"${GDB:-arm-none-eabi-gdb}\"\n\nCUBECLT_PROG_BIN=\"/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin\"\n\n# Strip libusb permission warnings and ANSI escapes from ST tool output.\nfilter_st_output() {\n    grep -vE 'libusb:|^\\s*$' | sed -r 's/\\x1B\\[[0-9;]*[mGKHF]//g'\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/scripts/_common.sh b/scripts/_common.sh
+--- a/scripts/_common.sh	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/scripts/_common.sh	(date 1779292288762)
+@@ -12,12 +12,14 @@
+ SWD_FREQ_KHZ="${SWD_FREQ_KHZ:-4000}"
+ GDB_PORT="${GDB_PORT:-61234}"
+ 
+-PROG_CLI="${PROG_CLI:-STM32_Programmer_CLI}"
+-GDB_SERVER="${GDB_SERVER:-ST-LINK_gdbserver}"
++CUBECLT_ROOT="${CUBECLT_ROOT:-/opt/st/stm32cubeclt_1.21.0}"
++CUBECLT_PROG_BIN="$CUBECLT_ROOT/STM32CubeProgrammer/bin"
++CUBECLT_GDB_BIN="$CUBECLT_ROOT/STLink-gdb-server/bin"
++
++PROG_CLI="${PROG_CLI:-$CUBECLT_PROG_BIN/STM32_Programmer_CLI}"
++GDB_SERVER="${GDB_SERVER:-$CUBECLT_GDB_BIN/ST-LINK_gdbserver}"
+ GDB="${GDB:-arm-none-eabi-gdb}"
+ 
+-CUBECLT_PROG_BIN="/opt/st/stm32cubeclt_1.21.0/STM32CubeProgrammer/bin"
+-
+ # Strip libusb permission warnings and ANSI escapes from ST tool output.
+ filter_st_output() {
+     grep -vE 'libusb:|^\s*$' | sed -r 's/\x1B\[[0-9;]*[mGKHF]//g'
+Index: cmake/stm32cubemx/CMakeLists.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>cmake_minimum_required(VERSION 3.22)\n# Enable CMake support for ASM and C languages\nenable_language(C ASM)\n# STM32CubeMX generated symbols (macros)\nset(MX_Defines_Syms \n\tUSE_HAL_DRIVER \n\tSTM32F722xx\n    $<$<CONFIG:Debug>:DEBUG>\n)\n\n# STM32CubeMX generated include paths\nset(MX_Include_Dirs\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Inc\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Inc\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/CMSIS/Device/ST/STM32F7xx/Include\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/CMSIS/Include\n)\n\n# STM32CubeMX generated application sources\nset(MX_Application_Src\r\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f7xx_it.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f7xx_hal_msp.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sysmem.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/syscalls.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f722xx.s\r\n)\r\n\n# STM32 HAL/LL Drivers\nset(STM32_Drivers_Src\r\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/system_stm32f7xx.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_spi_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_flash_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_dma_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pwr_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_i2c_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_exti.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_pcd_ex.c\n    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_ll_usb.c\r\n)\r\n\n# Drivers Midllewares\n\n\n\n# Link directories setup\nset(MX_LINK_DIRS\n\n)\n# Project static libraries\nset(MX_LINK_LIBS \n    STM32_Drivers\n    ${TOOLCHAIN_LINK_LIBRARIES}\n    \n)\n# Interface library for includes and symbols\nadd_library(stm32cubemx INTERFACE)\ntarget_include_directories(stm32cubemx INTERFACE ${MX_Include_Dirs})\ntarget_compile_definitions(stm32cubemx INTERFACE ${MX_Defines_Syms})\n\n# Create STM32_Drivers static library\nadd_library(STM32_Drivers OBJECT)\ntarget_sources(STM32_Drivers PRIVATE ${STM32_Drivers_Src})\ntarget_link_libraries(STM32_Drivers PUBLIC stm32cubemx)\n\n\n# Add STM32CubeMX generated application sources to the project\ntarget_sources(${CMAKE_PROJECT_NAME} PRIVATE ${MX_Application_Src})\n\n# Link directories setup\ntarget_link_directories(${CMAKE_PROJECT_NAME} PRIVATE ${MX_LINK_DIRS})\n\n# Add libraries to the project\ntarget_link_libraries(${CMAKE_PROJECT_NAME} ${MX_LINK_LIBS})\n\n# Add the map file to the list of files to be removed with 'clean' target\nset_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES ADDITIONAL_CLEAN_FILES ${CMAKE_PROJECT_NAME}.map)\n\n# Validate that STM32CubeMX code is compatible with C standard\nif((CMAKE_C_STANDARD EQUAL 90) OR (CMAKE_C_STANDARD EQUAL 99))\n    message(ERROR \"Generated code requires C11 or higher\")\nendif()\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmake/stm32cubemx/CMakeLists.txt b/cmake/stm32cubemx/CMakeLists.txt
+--- a/cmake/stm32cubemx/CMakeLists.txt	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/cmake/stm32cubemx/CMakeLists.txt	(date 1779293836355)
+@@ -20,6 +20,10 @@
+ # STM32CubeMX generated application sources
+ set(MX_Application_Src
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
++    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/gpio.c
++    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/spi.c
++    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/usart.c
++    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/usb_otg.c
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f7xx_it.c
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f7xx_hal_msp.c
+     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sysmem.c
+Index: Core/Src/stm32f7xx_hal_msp.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/* USER CODE BEGIN Header */\r\n/**\r\n  ******************************************************************************\r\n  * @file         stm32f7xx_hal_msp.c\r\n  * @brief        This file provides code for the MSP Initialization\r\n  *               and de-Initialization codes.\r\n  ******************************************************************************\r\n  * @attention\r\n  *\r\n  * Copyright (c) 2026 STMicroelectronics.\r\n  * All rights reserved.\r\n  *\r\n  * This software is licensed under terms that can be found in the LICENSE file\r\n  * in the root directory of this software component.\r\n  * If no LICENSE file comes with this software, it is provided AS-IS.\r\n  *\r\n  ******************************************************************************\r\n  */\r\n/* USER CODE END Header */\r\n/* Includes ------------------------------------------------------------------*/\r\n#include \"main.h\"\r\n/* USER CODE BEGIN Includes */\r\n\r\n/* USER CODE END Includes */\r\n\r\n/* Private typedef -----------------------------------------------------------*/\r\n/* USER CODE BEGIN TD */\r\n\r\n/* USER CODE END TD */\r\n\r\n/* Private define ------------------------------------------------------------*/\r\n/* USER CODE BEGIN Define */\r\n\r\n/* USER CODE END Define */\r\n\r\n/* Private macro -------------------------------------------------------------*/\r\n/* USER CODE BEGIN Macro */\r\n\r\n/* USER CODE END Macro */\r\n\r\n/* Private variables ---------------------------------------------------------*/\r\n/* USER CODE BEGIN PV */\r\n\r\n/* USER CODE END PV */\r\n\r\n/* Private function prototypes -----------------------------------------------*/\r\n/* USER CODE BEGIN PFP */\r\n\r\n/* USER CODE END PFP */\r\n\r\n/* External functions --------------------------------------------------------*/\r\n/* USER CODE BEGIN ExternalFunctions */\r\n\r\n/* USER CODE END ExternalFunctions */\r\n\r\n/* USER CODE BEGIN 0 */\r\n\r\n/* USER CODE END 0 */\r\n/**\r\n  * Initializes the Global MSP.\r\n  */\r\nvoid HAL_MspInit(void)\r\n{\r\n\r\n  /* USER CODE BEGIN MspInit 0 */\r\n\r\n  /* USER CODE END MspInit 0 */\r\n\r\n  __HAL_RCC_PWR_CLK_ENABLE();\r\n  __HAL_RCC_SYSCFG_CLK_ENABLE();\r\n\r\n  /* System interrupt init*/\r\n\r\n  /* USER CODE BEGIN MspInit 1 */\r\n\r\n  /* USER CODE END MspInit 1 */\r\n}\r\n\r\n/**\r\n  * @brief SPI MSP Initialization\r\n  * This function configures the hardware resources used in this example\r\n  * @param hspi: SPI handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)\r\n{\r\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\r\n  if(hspi->Instance==SPI1)\r\n  {\r\n    /* USER CODE BEGIN SPI1_MspInit 0 */\r\n\r\n    /* USER CODE END SPI1_MspInit 0 */\r\n    /* Peripheral clock enable */\r\n    __HAL_RCC_SPI1_CLK_ENABLE();\r\n\r\n    __HAL_RCC_GPIOA_CLK_ENABLE();\r\n    /**SPI1 GPIO Configuration\r\n    PA5     ------> SPI1_SCK\r\n    PA6     ------> SPI1_MISO\r\n    PA7     ------> SPI1_MOSI\r\n    */\r\n    GPIO_InitStruct.Pin = BNO_SCLK_Pin|BNO_MISO_Pin|BNO_MOSI_Pin;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;\r\n    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\r\n\r\n    /* USER CODE BEGIN SPI1_MspInit 1 */\r\n\r\n    /* USER CODE END SPI1_MspInit 1 */\r\n  }\r\n  else if(hspi->Instance==SPI2)\r\n  {\r\n    /* USER CODE BEGIN SPI2_MspInit 0 */\r\n\r\n    /* USER CODE END SPI2_MspInit 0 */\r\n    /* Peripheral clock enable */\r\n    __HAL_RCC_SPI2_CLK_ENABLE();\r\n\r\n    __HAL_RCC_GPIOC_CLK_ENABLE();\r\n    __HAL_RCC_GPIOB_CLK_ENABLE();\r\n    /**SPI2 GPIO Configuration\r\n    PC2     ------> SPI2_MISO\r\n    PC3     ------> SPI2_MOSI\r\n    PB10     ------> SPI2_SCK\r\n    */\r\n    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;\r\n    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);\r\n\r\n    GPIO_InitStruct.Pin = GPIO_PIN_10;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;\r\n    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);\r\n\r\n    /* USER CODE BEGIN SPI2_MspInit 1 */\r\n\r\n    /* USER CODE END SPI2_MspInit 1 */\r\n  }\r\n  else if(hspi->Instance==SPI3)\r\n  {\r\n    /* USER CODE BEGIN SPI3_MspInit 0 */\r\n\r\n    /* USER CODE END SPI3_MspInit 0 */\r\n    /* Peripheral clock enable */\r\n    __HAL_RCC_SPI3_CLK_ENABLE();\r\n\r\n    __HAL_RCC_GPIOC_CLK_ENABLE();\r\n    /**SPI3 GPIO Configuration\r\n    PC10     ------> SPI3_SCK\r\n    PC11     ------> SPI3_MISO\r\n    PC12     ------> SPI3_MOSI\r\n    */\r\n    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;\r\n    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);\r\n\r\n    /* USER CODE BEGIN SPI3_MspInit 1 */\r\n\r\n    /* USER CODE END SPI3_MspInit 1 */\r\n  }\r\n\r\n}\r\n\r\n/**\r\n  * @brief SPI MSP De-Initialization\r\n  * This function freeze the hardware resources used in this example\r\n  * @param hspi: SPI handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)\r\n{\r\n  if(hspi->Instance==SPI1)\r\n  {\r\n    /* USER CODE BEGIN SPI1_MspDeInit 0 */\r\n\r\n    /* USER CODE END SPI1_MspDeInit 0 */\r\n    /* Peripheral clock disable */\r\n    __HAL_RCC_SPI1_CLK_DISABLE();\r\n\r\n    /**SPI1 GPIO Configuration\r\n    PA5     ------> SPI1_SCK\r\n    PA6     ------> SPI1_MISO\r\n    PA7     ------> SPI1_MOSI\r\n    */\r\n    HAL_GPIO_DeInit(GPIOA, BNO_SCLK_Pin|BNO_MISO_Pin|BNO_MOSI_Pin);\r\n\r\n    /* USER CODE BEGIN SPI1_MspDeInit 1 */\r\n\r\n    /* USER CODE END SPI1_MspDeInit 1 */\r\n  }\r\n  else if(hspi->Instance==SPI2)\r\n  {\r\n    /* USER CODE BEGIN SPI2_MspDeInit 0 */\r\n\r\n    /* USER CODE END SPI2_MspDeInit 0 */\r\n    /* Peripheral clock disable */\r\n    __HAL_RCC_SPI2_CLK_DISABLE();\r\n\r\n    /**SPI2 GPIO Configuration\r\n    PC2     ------> SPI2_MISO\r\n    PC3     ------> SPI2_MOSI\r\n    PB10     ------> SPI2_SCK\r\n    */\r\n    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2|GPIO_PIN_3);\r\n\r\n    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);\r\n\r\n    /* USER CODE BEGIN SPI2_MspDeInit 1 */\r\n\r\n    /* USER CODE END SPI2_MspDeInit 1 */\r\n  }\r\n  else if(hspi->Instance==SPI3)\r\n  {\r\n    /* USER CODE BEGIN SPI3_MspDeInit 0 */\r\n\r\n    /* USER CODE END SPI3_MspDeInit 0 */\r\n    /* Peripheral clock disable */\r\n    __HAL_RCC_SPI3_CLK_DISABLE();\r\n\r\n    /**SPI3 GPIO Configuration\r\n    PC10     ------> SPI3_SCK\r\n    PC11     ------> SPI3_MISO\r\n    PC12     ------> SPI3_MOSI\r\n    */\r\n    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12);\r\n\r\n    /* USER CODE BEGIN SPI3_MspDeInit 1 */\r\n\r\n    /* USER CODE END SPI3_MspDeInit 1 */\r\n  }\r\n\r\n}\r\n\r\n/**\r\n  * @brief UART MSP Initialization\r\n  * This function configures the hardware resources used in this example\r\n  * @param huart: UART handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_UART_MspInit(UART_HandleTypeDef* huart)\r\n{\r\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\r\n  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};\r\n  if(huart->Instance==UART4)\r\n  {\r\n    /* USER CODE BEGIN UART4_MspInit 0 */\r\n\r\n    /* USER CODE END UART4_MspInit 0 */\r\n\r\n  /** Initializes the peripherals clock\r\n  */\r\n    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_UART4;\r\n    PeriphClkInitStruct.Uart4ClockSelection = RCC_UART4CLKSOURCE_PCLK1;\r\n    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)\r\n    {\r\n      Error_Handler();\r\n    }\r\n\r\n    /* Peripheral clock enable */\r\n    __HAL_RCC_UART4_CLK_ENABLE();\r\n\r\n    __HAL_RCC_GPIOA_CLK_ENABLE();\r\n    /**UART4 GPIO Configuration\r\n    PA0-WKUP     ------> UART4_TX\r\n    PA1     ------> UART4_RX\r\n    */\r\n    GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF8_UART4;\r\n    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\r\n\r\n    /* USER CODE BEGIN UART4_MspInit 1 */\r\n\r\n    /* USER CODE END UART4_MspInit 1 */\r\n\r\n  }\r\n\r\n}\r\n\r\n/**\r\n  * @brief UART MSP De-Initialization\r\n  * This function freeze the hardware resources used in this example\r\n  * @param huart: UART handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_UART_MspDeInit(UART_HandleTypeDef* huart)\r\n{\r\n  if(huart->Instance==UART4)\r\n  {\r\n    /* USER CODE BEGIN UART4_MspDeInit 0 */\r\n\r\n    /* USER CODE END UART4_MspDeInit 0 */\r\n    /* Peripheral clock disable */\r\n    __HAL_RCC_UART4_CLK_DISABLE();\r\n\r\n    /**UART4 GPIO Configuration\r\n    PA0-WKUP     ------> UART4_TX\r\n    PA1     ------> UART4_RX\r\n    */\r\n    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_0|GPIO_PIN_1);\r\n\r\n    /* USER CODE BEGIN UART4_MspDeInit 1 */\r\n\r\n    /* USER CODE END UART4_MspDeInit 1 */\r\n  }\r\n\r\n}\r\n\r\n/**\r\n  * @brief PCD MSP Initialization\r\n  * This function configures the hardware resources used in this example\r\n  * @param hpcd: PCD handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)\r\n{\r\n  GPIO_InitTypeDef GPIO_InitStruct = {0};\r\n  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};\r\n  if(hpcd->Instance==USB_OTG_FS)\r\n  {\r\n    /* USER CODE BEGIN USB_OTG_FS_MspInit 0 */\r\n\r\n    /* USER CODE END USB_OTG_FS_MspInit 0 */\r\n\r\n  /** Initializes the peripherals clock\r\n  */\r\n    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;\r\n    PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;\r\n    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)\r\n    {\r\n      Error_Handler();\r\n    }\r\n\r\n    __HAL_RCC_GPIOA_CLK_ENABLE();\r\n    /**USB_OTG_FS GPIO Configuration\r\n    PA9     ------> USB_OTG_FS_VBUS\r\n    PA11     ------> USB_OTG_FS_DM\r\n    PA12     ------> USB_OTG_FS_DP\r\n    */\r\n    GPIO_InitStruct.Pin = GPIO_PIN_9;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\r\n\r\n    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;\r\n    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;\r\n    GPIO_InitStruct.Pull = GPIO_NOPULL;\r\n    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;\r\n    GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;\r\n    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);\r\n\r\n    /* Peripheral clock enable */\r\n    __HAL_RCC_USB_OTG_FS_CLK_ENABLE();\r\n    /* USER CODE BEGIN USB_OTG_FS_MspInit 1 */\r\n\r\n    /* USER CODE END USB_OTG_FS_MspInit 1 */\r\n\r\n  }\r\n\r\n}\r\n\r\n/**\r\n  * @brief PCD MSP De-Initialization\r\n  * This function freeze the hardware resources used in this example\r\n  * @param hpcd: PCD handle pointer\r\n  * @retval None\r\n  */\r\nvoid HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)\r\n{\r\n  if(hpcd->Instance==USB_OTG_FS)\r\n  {\r\n    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 0 */\r\n\r\n    /* USER CODE END USB_OTG_FS_MspDeInit 0 */\r\n    /* Peripheral clock disable */\r\n    __HAL_RCC_USB_OTG_FS_CLK_DISABLE();\r\n\r\n    /**USB_OTG_FS GPIO Configuration\r\n    PA9     ------> USB_OTG_FS_VBUS\r\n    PA11     ------> USB_OTG_FS_DM\r\n    PA12     ------> USB_OTG_FS_DP\r\n    */\r\n    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_12);\r\n\r\n    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 1 */\r\n\r\n    /* USER CODE END USB_OTG_FS_MspDeInit 1 */\r\n  }\r\n\r\n}\r\n\r\n/* USER CODE BEGIN 1 */\r\n\r\n/* USER CODE END 1 */\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/Core/Src/stm32f7xx_hal_msp.c b/Core/Src/stm32f7xx_hal_msp.c
+--- a/Core/Src/stm32f7xx_hal_msp.c	(revision 0bf38b5490059c98c3753a653dc23235061afe5f)
++++ b/Core/Src/stm32f7xx_hal_msp.c	(date 1779293835481)
+@@ -76,331 +76,6 @@
+   /* USER CODE END MspInit 1 */
+ }
+ 
+-/**
+-  * @brief SPI MSP Initialization
+-  * This function configures the hardware resources used in this example
+-  * @param hspi: SPI handle pointer
+-  * @retval None
+-  */
+-void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
+-{
+-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+-  if(hspi->Instance==SPI1)
+-  {
+-    /* USER CODE BEGIN SPI1_MspInit 0 */
+-
+-    /* USER CODE END SPI1_MspInit 0 */
+-    /* Peripheral clock enable */
+-    __HAL_RCC_SPI1_CLK_ENABLE();
+-
+-    __HAL_RCC_GPIOA_CLK_ENABLE();
+-    /**SPI1 GPIO Configuration
+-    PA5     ------> SPI1_SCK
+-    PA6     ------> SPI1_MISO
+-    PA7     ------> SPI1_MOSI
+-    */
+-    GPIO_InitStruct.Pin = BNO_SCLK_Pin|BNO_MISO_Pin|BNO_MOSI_Pin;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
+-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+-
+-    /* USER CODE BEGIN SPI1_MspInit 1 */
+-
+-    /* USER CODE END SPI1_MspInit 1 */
+-  }
+-  else if(hspi->Instance==SPI2)
+-  {
+-    /* USER CODE BEGIN SPI2_MspInit 0 */
+-
+-    /* USER CODE END SPI2_MspInit 0 */
+-    /* Peripheral clock enable */
+-    __HAL_RCC_SPI2_CLK_ENABLE();
+-
+-    __HAL_RCC_GPIOC_CLK_ENABLE();
+-    __HAL_RCC_GPIOB_CLK_ENABLE();
+-    /**SPI2 GPIO Configuration
+-    PC2     ------> SPI2_MISO
+-    PC3     ------> SPI2_MOSI
+-    PB10     ------> SPI2_SCK
+-    */
+-    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+-
+-    GPIO_InitStruct.Pin = GPIO_PIN_10;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+-
+-    /* USER CODE BEGIN SPI2_MspInit 1 */
+-
+-    /* USER CODE END SPI2_MspInit 1 */
+-  }
+-  else if(hspi->Instance==SPI3)
+-  {
+-    /* USER CODE BEGIN SPI3_MspInit 0 */
+-
+-    /* USER CODE END SPI3_MspInit 0 */
+-    /* Peripheral clock enable */
+-    __HAL_RCC_SPI3_CLK_ENABLE();
+-
+-    __HAL_RCC_GPIOC_CLK_ENABLE();
+-    /**SPI3 GPIO Configuration
+-    PC10     ------> SPI3_SCK
+-    PC11     ------> SPI3_MISO
+-    PC12     ------> SPI3_MOSI
+-    */
+-    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
+-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+-
+-    /* USER CODE BEGIN SPI3_MspInit 1 */
+-
+-    /* USER CODE END SPI3_MspInit 1 */
+-  }
+-
+-}
+-
+-/**
+-  * @brief SPI MSP De-Initialization
+-  * This function freeze the hardware resources used in this example
+-  * @param hspi: SPI handle pointer
+-  * @retval None
+-  */
+-void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
+-{
+-  if(hspi->Instance==SPI1)
+-  {
+-    /* USER CODE BEGIN SPI1_MspDeInit 0 */
+-
+-    /* USER CODE END SPI1_MspDeInit 0 */
+-    /* Peripheral clock disable */
+-    __HAL_RCC_SPI1_CLK_DISABLE();
+-
+-    /**SPI1 GPIO Configuration
+-    PA5     ------> SPI1_SCK
+-    PA6     ------> SPI1_MISO
+-    PA7     ------> SPI1_MOSI
+-    */
+-    HAL_GPIO_DeInit(GPIOA, BNO_SCLK_Pin|BNO_MISO_Pin|BNO_MOSI_Pin);
+-
+-    /* USER CODE BEGIN SPI1_MspDeInit 1 */
+-
+-    /* USER CODE END SPI1_MspDeInit 1 */
+-  }
+-  else if(hspi->Instance==SPI2)
+-  {
+-    /* USER CODE BEGIN SPI2_MspDeInit 0 */
+-
+-    /* USER CODE END SPI2_MspDeInit 0 */
+-    /* Peripheral clock disable */
+-    __HAL_RCC_SPI2_CLK_DISABLE();
+-
+-    /**SPI2 GPIO Configuration
+-    PC2     ------> SPI2_MISO
+-    PC3     ------> SPI2_MOSI
+-    PB10     ------> SPI2_SCK
+-    */
+-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2|GPIO_PIN_3);
+-
+-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);
+-
+-    /* USER CODE BEGIN SPI2_MspDeInit 1 */
+-
+-    /* USER CODE END SPI2_MspDeInit 1 */
+-  }
+-  else if(hspi->Instance==SPI3)
+-  {
+-    /* USER CODE BEGIN SPI3_MspDeInit 0 */
+-
+-    /* USER CODE END SPI3_MspDeInit 0 */
+-    /* Peripheral clock disable */
+-    __HAL_RCC_SPI3_CLK_DISABLE();
+-
+-    /**SPI3 GPIO Configuration
+-    PC10     ------> SPI3_SCK
+-    PC11     ------> SPI3_MISO
+-    PC12     ------> SPI3_MOSI
+-    */
+-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12);
+-
+-    /* USER CODE BEGIN SPI3_MspDeInit 1 */
+-
+-    /* USER CODE END SPI3_MspDeInit 1 */
+-  }
+-
+-}
+-
+-/**
+-  * @brief UART MSP Initialization
+-  * This function configures the hardware resources used in this example
+-  * @param huart: UART handle pointer
+-  * @retval None
+-  */
+-void HAL_UART_MspInit(UART_HandleTypeDef* huart)
+-{
+-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+-  if(huart->Instance==UART4)
+-  {
+-    /* USER CODE BEGIN UART4_MspInit 0 */
+-
+-    /* USER CODE END UART4_MspInit 0 */
+-
+-  /** Initializes the peripherals clock
+-  */
+-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_UART4;
+-    PeriphClkInitStruct.Uart4ClockSelection = RCC_UART4CLKSOURCE_PCLK1;
+-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+-    {
+-      Error_Handler();
+-    }
+-
+-    /* Peripheral clock enable */
+-    __HAL_RCC_UART4_CLK_ENABLE();
+-
+-    __HAL_RCC_GPIOA_CLK_ENABLE();
+-    /**UART4 GPIO Configuration
+-    PA0-WKUP     ------> UART4_TX
+-    PA1     ------> UART4_RX
+-    */
+-    GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF8_UART4;
+-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+-
+-    /* USER CODE BEGIN UART4_MspInit 1 */
+-
+-    /* USER CODE END UART4_MspInit 1 */
+-
+-  }
+-
+-}
+-
+-/**
+-  * @brief UART MSP De-Initialization
+-  * This function freeze the hardware resources used in this example
+-  * @param huart: UART handle pointer
+-  * @retval None
+-  */
+-void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
+-{
+-  if(huart->Instance==UART4)
+-  {
+-    /* USER CODE BEGIN UART4_MspDeInit 0 */
+-
+-    /* USER CODE END UART4_MspDeInit 0 */
+-    /* Peripheral clock disable */
+-    __HAL_RCC_UART4_CLK_DISABLE();
+-
+-    /**UART4 GPIO Configuration
+-    PA0-WKUP     ------> UART4_TX
+-    PA1     ------> UART4_RX
+-    */
+-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_0|GPIO_PIN_1);
+-
+-    /* USER CODE BEGIN UART4_MspDeInit 1 */
+-
+-    /* USER CODE END UART4_MspDeInit 1 */
+-  }
+-
+-}
+-
+-/**
+-  * @brief PCD MSP Initialization
+-  * This function configures the hardware resources used in this example
+-  * @param hpcd: PCD handle pointer
+-  * @retval None
+-  */
+-void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
+-{
+-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+-  if(hpcd->Instance==USB_OTG_FS)
+-  {
+-    /* USER CODE BEGIN USB_OTG_FS_MspInit 0 */
+-
+-    /* USER CODE END USB_OTG_FS_MspInit 0 */
+-
+-  /** Initializes the peripherals clock
+-  */
+-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CLK48;
+-    PeriphClkInitStruct.Clk48ClockSelection = RCC_CLK48SOURCE_PLL;
+-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+-    {
+-      Error_Handler();
+-    }
+-
+-    __HAL_RCC_GPIOA_CLK_ENABLE();
+-    /**USB_OTG_FS GPIO Configuration
+-    PA9     ------> USB_OTG_FS_VBUS
+-    PA11     ------> USB_OTG_FS_DM
+-    PA12     ------> USB_OTG_FS_DP
+-    */
+-    GPIO_InitStruct.Pin = GPIO_PIN_9;
+-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+-
+-    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+-    GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
+-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+-
+-    /* Peripheral clock enable */
+-    __HAL_RCC_USB_OTG_FS_CLK_ENABLE();
+-    /* USER CODE BEGIN USB_OTG_FS_MspInit 1 */
+-
+-    /* USER CODE END USB_OTG_FS_MspInit 1 */
+-
+-  }
+-
+-}
+-
+-/**
+-  * @brief PCD MSP De-Initialization
+-  * This function freeze the hardware resources used in this example
+-  * @param hpcd: PCD handle pointer
+-  * @retval None
+-  */
+-void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
+-{
+-  if(hpcd->Instance==USB_OTG_FS)
+-  {
+-    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 0 */
+-
+-    /* USER CODE END USB_OTG_FS_MspDeInit 0 */
+-    /* Peripheral clock disable */
+-    __HAL_RCC_USB_OTG_FS_CLK_DISABLE();
+-
+-    /**USB_OTG_FS GPIO Configuration
+-    PA9     ------> USB_OTG_FS_VBUS
+-    PA11     ------> USB_OTG_FS_DM
+-    PA12     ------> USB_OTG_FS_DP
+-    */
+-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_12);
+-
+-    /* USER CODE BEGIN USB_OTG_FS_MspDeInit 1 */
+-
+-    /* USER CODE END USB_OTG_FS_MspDeInit 1 */
+-  }
+-
+-}
+-
+ /* USER CODE BEGIN 1 */
+ 
+ /* USER CODE END 1 */
