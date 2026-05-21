@@ -15,6 +15,8 @@ All workflow goes through `Firmware/scripts/`. They work from any CWD, source `_
 | `erase.sh` | Full chip erase under reset. Use when target is bricked / unresponsive. |
 | `gdbserver.sh` | Foreground `ST-LINK_gdbserver` on `:61234`. For IDE external-server debug configs. |
 | `debug.sh` | `build.sh` + gdbserver in background + interactive `arm-none-eabi-gdb` with `load` and `tbreak main`. |
+| `uart.sh` | Stream UART4 `printf` output (J703, 115200 8N1) from the USB-UART adapter. Auto-detects CP2102, falls back to `/dev/ttyUSB0`. Logs to `$BUILD_DIR/uart.log`. |
+| `swo.sh` | Stream SWO/ITM trace from PB3 via `STM32_Programmer_CLI -startswv`. **Requires a genuine ST-LINK V3** — most ST-LINK V2 clones (green USB stick) don't route TRACESWO internally. Logs to `$BUILD_DIR/swv.log`. See troubleshooting below. |
 
 ### Env overrides
 
@@ -24,6 +26,10 @@ All workflow goes through `Firmware/scripts/`. They work from any CWD, source `_
 | `SWD_FREQ_KHZ` | `4000` | ST-LINK SWD clock |
 | `GDB_PORT` | `61234` | Port for `gdbserver.sh` / `debug.sh` |
 | `PROG_CLI`, `GDB_SERVER`, `GDB` | binaries on PATH | Override tool binaries |
+| `UART_DEV` | auto (CP2102) / `/dev/ttyUSB0` | Serial device for `uart.sh` |
+| `UART_BAUD` | `115200` | Baud rate for `uart.sh` (must match `MX_UART4_Init`) |
+| `SYSCLK_MHZ` | `192` | HCLK in MHz for `swo.sh` (must match `swo_init()` call) |
+| `SWV_PORT` | `0` | ITM stimulus port for `swo.sh` |
 
 Example: release build, flashed at slower clock:
 
@@ -94,8 +100,11 @@ Everything runs without CLion. Example one-shot edit→flash cycle for an agent:
 $EDITOR Firmware/Core/Src/main.c
 # build + flash + run, single command, works from any CWD
 Firmware/scripts/flash.sh
-# observe via UART (UART4 on PA0/PA1) or SWO (PB3) — TODO: add monitor script
+# observe printf output via UART4 on PA0/PA1 (J703) — start before flash to catch boot lines
+Firmware/scripts/uart.sh
 ```
+
+`__io_putchar` writes to both SWO/ITM (PB3) and UART4 — printf goes out whichever path you can capture. SWO needs a working trace probe (see troubleshooting); UART4 needs only a 3.3 V USB-UART adapter on J703 with GND tied to board ground.
 
 For a brick (target won't enumerate on SWD under normal connect), use connect-under-reset path:
 
@@ -112,4 +121,6 @@ Firmware/scripts/flash.sh    # then re-flash
 | `libusb: error … requires write access` | udev rules not applied | `sudo udevadm control --reload-rules && sudo udevadm trigger` + re-plug ST-LINK |
 | `Duplicate preset: "Debug"` from cmake | Local `CMakeUserPresets.json` collides with `CMakePresets.json` | Rename local presets (e.g. `Debug-local`) or delete the user file |
 | Verify fails after download | Wrong target / corrupted flash sector | `erase.sh` then retry |
+| `swo.sh` prints "Reception Started" then nothing | Clone ST-LINK V2 (green USB stick) — `T_JTDO` pin exists but isn't internally wired to the probe's TRACESWO input. Reflashing the official ST firmware (`/opt/st/stm32cubeclt_1.21.0/STLinkUpgrade.sh -force_prog`) does **not** fix this; the limitation is hardware. | Use `uart.sh` instead, or get an STLINK-V3MINIE. |
+| `uart.sh` shows 0 bytes | **UART4 is verified working** — if you see nothing, the cause is almost always one of: (1) `uart.sh` was started *after* `flash.sh`, missing the boot-time burst (most common — the loop's `printf`s may also stop appearing if a driver init blocks the main loop from being reached); (2) **GND not bridged** between USB-UART adapter and board (silent failure); (3) baudrate mismatch (must be 115200, see `MX_UART4_Init`); (4) firmware actually hangs before reaching the first `printf` (rare — `swo_init` + `setvbuf` are the only things ahead of `printf("[boot] …")`). | Start `uart.sh` **before** `flash.sh`, confirm shared GND. To distinguish "MCU hung" from "UART broken", read `g_bno_init_status` / `g_paa_init_status` / `g_bno_stage` via `STM32_Programmer_CLI -c port=SWD mode=HOTPLUG -r32 <addr> 4` — if the stage variable advances, the firmware runs and the silence is on the host/wiring side. |
 | GDB server: `Port 61234 already in use` | Previous `gdbserver.sh` still running | `pkill -f ST-LINK_gdbserver` or set `GDB_PORT=61235` |

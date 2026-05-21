@@ -7,10 +7,14 @@ muss mit Elektroniker durchgegangen werden.
 ## Hintergrund — Software-Status
 
 Firmware steht für Bringup bereit (`Firmware/drivers/bno08x/` + `app/`).
-Aktueller Stand nach dem .ioc-Fix (PB2.PinState=GPIO_PIN_SET) und HSI-
-Workaround: BNO086 bootet in den App-Mode, `sh2_open` läuft erfolgreich
-durch (SHTP-Handshake OK, INT-Leitung funktioniert elektrisch), aber
-`sh2_getProdIds` kehrt nicht zurück → siehe Issue 2 (neu gefasst).
+Aktueller Stand nach umfassender SW-Diagnose (Session 2026-05-21):
+BNO086 wird vom STM32 elektrisch zwar gepingt (INT geht LOW nach Reset),
+aber **die BNO treibt MISO nie aktiv** — alle „gelesenen Pakete" sind
+Threshold-Artefakte einer floatenden MISO-Leitung. Heißt: SPI-Kommunikation
+kommt nicht zustande. Hauptverdacht: **CS-Pfad zur BNO unterbrochen**
+(siehe Issue 2 — neu fokussiert). Mehrere SW-Hypothesen wurden eliminiert
+(SPI-Mode, Clock-Speed, Pullups, Boot-Delay) — nur Hardware bleibt übrig.
+
 Software erkennt den Zustand und blinkt die USER-LED entsprechend:
 
 | LED-Muster | Bedeutung |
@@ -53,50 +57,67 @@ sobald die Hardware sauber ist.
 
 Wahrscheinlichste Ursache: kalte/fehlende Löt­stelle an Y202 oder R203.
 
-## Issue 2 — BNO086 `sh2_getProdIds` kehrt nicht zurück
+## Issue 2 — BNO086 SPI: CS-Pfad zur BNO unterbrochen (Hauptverdacht)
 
-**Status:** Reframed nach Bringup-Session 2026-05-21. Vorher als
-"INT-Leitung kommt nicht durch" diagnostiziert — das war ein Folge­symptom
-von Issue 3 (BNO im Bootloader-Mode). Mit `.ioc`-Fix (PB2.PinState=SET) ist
-INT elektrisch nachgewiesen funktional.
+**Status:** Stark reframed nach Bringup-Session 2026-05-21 (zweite Iteration).
+Vorher als „INT-Leitung kaputt" → dann „sh2_getProdIds hängt" → jetzt
+**„BNO treibt MISO nie aktiv = CS sieht der BNO nie als LOW"** diagnostiziert.
+32k-Clock wurde vom Elektroniker gemessen und ist nicht das Problem.
 
 **Aktuelle Symptome:**
 
 ```
-g_bno_stage             = 20      (post sh2_open, in sh2_getProdIds)
-g_sh2_open_rc           = 0       (SHTP-Setup erfolgreich)
-g_sh2_prodids_rc        = 0xCAFE  (Sentinel — sh2_getProdIds nie zurück)
-g_int_after_reset       = 0       (INT korrekt LOW direkt nach Reset)
-g_int_ms_to_assert      = 0
-g_first_read_buf        = {0,0,…} (saubere Frames, kein Idle-Geklingel)
-g_exti4_falling_count   = ~417k bei erstem Halt, danach STILL
+g_bno_stage             = 20      (in sh2_getProdIds steckend)
+g_sh2_open_rc           = 0
+g_sh2_prodids_rc        = 0xCAFE  (Sentinel — getProdIds nie zurück)
+g_int_after_reset       = 0       (INT geht LOW nach Reset → BNO bootet
+                                   elektrisch und WILL senden)
+g_reads_with_data       = 0–82    (variabel über Runs — unstable)
+g_writes_ok             = 0–1     (eigentlich kein Write durchgekommen)
+g_real_pkt_hdr          = {0xF8|0xFC|0xC0|0xE0|0x80, 0, 0, 0}
+                                  (über alle Runs: hdr[0] hat nur HIGH-Bits
+                                   gesetzt, LOW-Bits immer 0 — kein 0x55, kein
+                                   0xAA, kein echter SHTP-Header je gesehen)
+g_real_pkt_payload      = {0,0,…} (Payload immer ALL ZEROS)
+_sh2.resetComplete      = false   (Lib hat nie einen SH2_RESET-Event gesehen)
 ```
 
-Heißt: BNO sendet beim Boot den Advertise-Burst (EXTI feuert massiv),
-SHTP-Handshake klappt. Sobald die Lib aber `getProdIds` schickt, bekommt
-sie keine Antwort mehr (EXTI-Counter steht).
+**Was wir software­seitig eliminiert haben:**
 
-**Plausibelste Restursache: 32 kHz-Clock fehlt (Y401 / R406)**
+| Hypothese | Test | Ergebnis |
+|---|---|---|
+| SPI-Mode falsch | Mode 0 statt Mode 3 | Garbage genauso |
+| SPI-Clock zu schnell | 750 kHz statt 3 MHz | gleiches Pattern |
+| NRST/BOOTN-Sequenz falsch | `.ioc` PinState=SET für PB0 + PB2 | half nicht für das eigentliche Problem |
+| Boot-Delay zu kurz/lang | 1 ms vs 500 ms post-INT | kein Unterschied |
+| MISO floated → interner Pullup | PA6 PULLUP statt NOPULL | mit Pullup alles 0xFF → **BNO treibt MISO einfach nicht** |
+| WAKE-Pin nicht durch | g_writes_ack_int wurde 1× true | WAKE-Leitung funktioniert |
+| PS1/PS0 falsch verdrahtet | PCB-Agent Audit | R407+R408 = 10 kΩ Pullups beide auf 3V3, korrekt |
+| BNO-Firmware kaputt | — | Advertise-Bursts kommen elektrisch durch (INT toggelt) → BNO lebt |
 
-Die BNO086 braucht die externe 32.768 kHz-Referenz an XIN32, sonst läuft
-die SH2-App-Firmware unvollständig — Advertise-Burst kommt aus dem ROM-
-Bootloader noch durch, aber sobald die Sensor-/App-Logik selbst antworten
-müsste (z. B. auf `getProdIds`), passiert nichts. Klassisches Symptom.
+**Schlüssel-Beobachtung — Pullup-Test ist beweisend:**
+Mit STM32-internem Pullup auf MISO (PA6) lasen alle Reads 0xFF (12558×
+hdr_ff in 12k Calls). Wenn die BNO aktiv MISO treiben würde, würde
+sie als push-pull-Treiber den schwachen internen Pullup überstimmen.
+Tut sie nicht. Heißt: **die BNO sieht CS NIE als LOW** und tri-staatet
+MISO durchgehend. Ohne Pullup floated die Leitung dann durch den
+Threshold und produziert die „high-bits set, low-bits 0"-Pattern, die
+das SHTP zufällig als Header mit großer Länge interpretiert →
+„Payload" sind dann die nachfolgenden Null-Reads vom Tri-State.
 
-**Was zu prüfen ist:**
+**Was zu prüfen ist (HARDWARE, software ist durch):**
 
 | Punkt | Wie | Erwartung |
 |---|---|---|
-| **R406 (0 Ω) zwischen Y401 Pin 3 und BNO086 Pin 27 (XIN32)** | Lupe + DMM-Durchgang | Best­ückt, < 1 Ω. **Hauptverdacht.** |
-| **Y401 Output am Pin 3** | Scope (~32 kHz CMOS-Rechteck) | Wenn tot: Pin 1 (Tri-State EN) prüfen — offen oder VDD. R404 ist DNP, EN sollte intern hochgepullt sein. |
-| **Y401 VDD (Pin 4)** | DMM ↔ GND | 3.3 V. |
-| **R501–R505 (BNO-Bus-Pullups / Series)** | BOM + Durchgang | Alle best­ückt? Falsche Werte würden zwar nicht erst nach `sh2_open` Probleme machen, aber Vollständigkeit. |
-| **U401 VDD + VDDIO (Pin 3 + 28)** | DMM ↔ GND | 3.3 V stabil. |
+| **DMM-Durchgang STM32 PA4 ↔ BNO086 Pin 18 (CSN)** | Multimeter Ω | < 1 Ω. **Hauptverdacht — Lötstelle am BNO-CSN-Pad oder Riss in der Leiterbahn.** |
+| **R401** (laut BOM als DNP markiert, aber im BNO-Bereich platziert) | Bestückung + Lage prüfen | Falls R401 doch im CS-Pfad sitzt und nicht bestückt → CS unterbrochen. PCB-Agent hat R401 als „in der BNO oszillator/cap region, nicht auf SPI" eingestuft — **aber bitte am echten Schaltplan verifizieren**. |
+| **Lupe über U401 Pin 18 (CSN)** | optisch | Kein Lift, keine kalte Lötstelle, kein Solder-Brücken-Lift. |
+| **U401 VDD (Pin 3) + VDDIO (Pin 28)** | DMM ↔ GND | 3.3 V stabil. Wenn VDDIO kaputt → I/O-Buffer (inkl. MISO-Driver) tot. |
+| **U401 Pin 25 (DSACT) + andere I/O** | Lupe / Durchgang | Allgemeiner Pin-Sanity. |
 
-Wenn der 32k-Clock OK ist und das Symptom bleibt, weiter eingrenzen mit
-einer SPI-Trace (Saleae o.ä.) auf MOSI/MISO/CS/CLK — schauen ob der
-GetProdIds-Request überhaupt sauber rausgeht und ob der BNO ein NAK/Empty-
-Read zurückgibt.
+**Falls CS-Durchgang nachgewiesen OK ist:** weiter mit Logic Analyzer auf
+MOSI/MISO/CS/CLK — direkt sehen ob CS wirklich beim BNO-Pin LOW ankommt
+beim ersten SPI-Read. Mit Saleae oder ähnlichem.
 
 ## Issue 3 — `BNO_NBOOT` an PB2 wird im CubeMX-Init auf LOW gezogen ✅ FIXED
 
@@ -110,7 +131,12 @@ erfolgreich durch, INT-Leitung asserted korrekt.
 Reset LOW (BOOTN active-low → "in Bootloader"). Der BNO sendete dann
 nur den Bootloader-Advertise und reagierte nicht auf SH2-Protokoll-Pakete
 → INT blieb dauerhaft HIGH → wurde fälschlich als "INT-Leitung kaputt"
-diagnostiziert (siehe Issue 2 alte Fassung).
+diagnostiziert.
+
+**Sibling-Fix (gleicher Patch):** PB0 (BNO_NRST) hat in der `.ioc` ebenfalls
+`PinState=GPIO_PIN_SET` bekommen. Sonst hielt MX_GPIO_Init die BNO bis
+`nrst_high()` in `bno08x_init` aktiv im Reset, was zu fragmentierten
+Boot-States führte.
 
 Schaltplan-Hinweis: R409 (10 kΩ) zieht BNO_NBOOT zwar auf 3V3, das wird
 aber von PB2 (push-pull Output) überschrieben — `.ioc`-Default ist
@@ -146,14 +172,17 @@ BNO sauber läuft, sonst verteilt sich die Fehlersuche auf zwei IMUs.
 
 ## Status / Reihenfolge
 
-1. **Issue 2 (BNO `getProdIds` hängt)** — verdacht Y401 / 32 kHz-Clock,
-   Hardware-Check nötig.
+1. **Issue 2 (BNO SPI: CS-Pfad)** — Hauptverdacht: PA4 ↔ BNO086 Pin 18 (CSN)
+   unterbrochen. DMM-Durchgang zwingend bevor weitergebastelt wird. Software
+   ist durch (Mode, Clock, Pullups, Boot-Delay, Pin-States, WAKE alle
+   eliminiert).
 2. **Issue 1 (HSE-Quarz)** — Workaround aktiv (HSI in `main.c`,
    nicht-`.ioc`), sollte trotzdem nachgelötet werden, weil HSE-Genauigkeit
    für Sensor-Timing besser ist als HSI. ⚠️ Workaround geht bei jedem
    CubeMX-Regen verloren — manuell wieder einsetzen oder `.ioc` auf HSI
    umstellen.
-3. **Issue 3 (BOOTN)** ✅ behoben in `.ioc` + Firmware-Backup.
+3. **Issue 3 (BOOTN + NRST)** ✅ behoben in `.ioc` (PB0+PB2 PinState=SET)
+   + Firmware-Backup.
 4. **Issue 4 (UART-Adapter)** — Quality-of-Life, nicht blockierend.
 5. **Issue 5 (USB-C)** — wenn standalone-Betrieb gewünscht.
 

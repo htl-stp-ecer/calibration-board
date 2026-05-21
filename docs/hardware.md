@@ -11,7 +11,7 @@ The calibration board is a carrier PCB for the Raccoon Botball robot, designed t
 | Function | Pins |
 |---|---|
 | **SWD** | PA13 (SWDIO), PA14 (SWCLK), PB3 (SWO) |
-| **UART4** (debug console) | PA0 (TX), PA1 (RX) |
+| **UART4** (debug console) | PA0 (TX → adapter RX), PA1 (RX ← adapter TX), 115200 8N1, broken out on J703. Stream with `Firmware/scripts/uart.sh`. Common GND required, **do not** also bridge VCC if board is powered via ST-LINK. |
 | **SPI1** | PA5 (SCK), PA6 (MISO), PA7 (MOSI) — IMU #1 candidate bus |
 | **SPI2** | PB10 (SCK), PC2 (MISO), PC3 (MOSI) — IMU #2 candidate bus |
 | **SPI3** | PC10 (SCK), PC11 (MISO), PC12 (MOSI) — IMU #3 candidate bus |

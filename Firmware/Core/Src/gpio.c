@@ -55,11 +55,11 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, FLOW_SENS_CS_Pin|BNO_CS1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, BNO_NRST_Pin|BNO_WAKE_Pin|add_PB11_Pin|add_PB12_Pin
-                          |add_PB13_Pin|add_PB14_Pin|add_PB15_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, BNO_NRST_Pin|BNO_NBOOT_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(BNO_NBOOT_GPIO_Port, BNO_NBOOT_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, BNO_WAKE_Pin|add_PB11_Pin|add_PB12_Pin|add_PB13_Pin
+                          |add_PB14_Pin|add_PB15_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, add_PC6_Pin|add_PC7_Pin|add_PC8_Pin|USER_LED_Pin, GPIO_PIN_RESET);

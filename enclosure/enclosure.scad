@@ -17,12 +17,13 @@ wall       = 2.0;      // outer wall thickness
 floor_thk  = 2.0;      // bottom plate thickness
 lid_thk    = 2.0;      // lid plate thickness
 gap        = 0.4;      // clearance between PCB edge and inner wall
-standoff_h = 6.0;      // floor-top to PCB-bottom
-clear_top  = 12.0;     // PCB-top to lid-inner
+standoff_h = 1.0;      // floor-top to PCB-bottom
+clear_top  = 7.2;      // PCB-top to lid-inner; keeps USB-C cutout vertically centered in wall
 
 post_od    = 5.5;      // standoff/screw post outer diameter
 pilot_d    = 1.7;      // M2 self-tap pilot hole diameter
 lid_clear  = 2.3;      // lid screw clearance hole (M2 loose)
+pcb_pilot_bottom_skin = 0.4; // leave this much material under PCB screw pilot holes
 
 // Lid drops into a rebate so it self-aligns
 rebate_depth = 1.2;
@@ -43,6 +44,10 @@ outer_y = inner_y - wall;
 outer_w = inner_w + 2*wall;
 outer_h = inner_h + 2*wall;
 outer_r = inner_r + wall;
+box_cx = pcb_x + pcb_w/2;
+box_cy = pcb_y + pcb_h/2;
+
+function mirror_y(y) = 2*box_cy - y;
 
 // Total inner height (floor inner to lid-rebate level)
 post_total = standoff_h + pcb_thk + clear_top;
@@ -72,13 +77,15 @@ ear_positions = [
 // --- Lid cutouts: [center_x, center_y, width_x, width_y] in PCB coords ---
 // All connectors are on F.Cu (top of PCB) and accessed through the lid.
 // Sized from actual pad bounding boxes + ~3mm margin for connector body / cable.
+swd_uart_shift = 11.5; // move SWD opening toward the UART header
+
 lid_cutouts = [
-    // SWD J501 (1x6 vertical, top edge): pads X=27.3..39.97, Y=78.19
-    [33.62,  78.19, 16.0, 7.0],
+    // SWD J501 (1x6 vertical, top edge): pads X=27.27..39.97, Y=78.19
+    [33.62 + swd_uart_shift, 78.19, 17.0, 7.0],
     // Optical Flow J601 (1x7 vertical, right edge): pads X=76.8, Y=40.1..55.3
-    [76.8,   47.71,  7.0, 18.0],
+    [76.8,   47.71,  7.0, 19.0],
     // UART J703 (1x4 vertical, right edge): pads X=76.8, Y=61.7..69.3
-    [76.8,   65.49,  7.0, 10.0],
+    [76.8,   65.49,  7.0, 11.0],
 ];
 
 // --- Floor cutouts: same format, cut through the case floor ---
@@ -87,8 +94,8 @@ lid_cutouts = [
 // J102 (1x2 power, F.Cu) accessed from below per request.
 //   Pads X=30.06, Y=40.08..42.62
 floor_cutouts = [
-    [44.635, 76.0,  14.0, 5.0],   // J702 GPIO breakout (B.Cu: Y mirrored about box centre)
-    [30.06,  67.65,  5.0, 6.0],   // J102 5V power     (B.Cu: Y mirrored about box centre)
+    [44.635, mirror_y(33.0),   14.0, 5.0],   // J702 GPIO breakout (B.Cu: Y mirrored about box centre)
+    [30.06,  mirror_y(41.35),   5.0, 6.0],   // J102 5V power     (B.Cu: Y mirrored about box centre)
 ];
 
 // User LEDs (small viewing holes in lid)
@@ -161,6 +168,11 @@ module bottom() {
             translate([p[0], p[1], -0.1])
                 cylinder(d=pilot_d, h=ear_h + 0.2);
 
+        // PCB mounting screw pilots continue into the floor, leaving a thin bottom skin.
+        for (h = holes)
+            translate([h[0], h[1], pcb_pilot_bottom_skin])
+                cylinder(d=pilot_d, h=floor_thk - pcb_pilot_bottom_skin + 0.2);
+
         // Floor cutouts
         for (c = floor_cutouts)
             translate([c[0] - c[2]/2, c[1] - c[3]/2, -1])
@@ -226,7 +238,7 @@ module lid() {
 
         // Connector cutouts (rectangles, rounded corners)
         for (c = lid_cutouts)
-            translate([c[0], c[1], -rebate_depth - 1])
+            translate([c[0], mirror_y(c[1]), -rebate_depth - 1])
                 linear_extrude(lid_thk + rebate_depth + 2)
                     offset(r=1, $fn=24)
                         offset(r=-1)
@@ -234,7 +246,7 @@ module lid() {
 
         // LED viewing holes
         for (p = led_positions)
-            translate([p[0], p[1], -rebate_depth - 1])
+            translate([p[0], mirror_y(p[1]), -rebate_depth - 1])
                 cylinder(d=led_hole_d, h=lid_thk + rebate_depth + 2);
     }
 }
@@ -246,9 +258,6 @@ module lid() {
 //                    side on user's LEFT. Reflection -> do not export as STL!
 PART = "all";
 VIEW = "stl";
-
-box_cx = pcb_x + pcb_w/2;
-box_cy = pcb_y + pcb_h/2;
 
 module view_transform() {
     if (VIEW == "kicad") {

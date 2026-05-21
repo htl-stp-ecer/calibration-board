@@ -51,7 +51,11 @@ volatile uint8_t  g_real_pkt_payload[32] = {0};
 volatile uint16_t g_real_pkt_len         = 0;
 
 #define BNO_INT_TIMEOUT_MS  300u
-#define BNO_BOOT_DELAY_MS   500u
+/* WICHTIG: Datasheet sagt der Host muss innerhalb ~10 ms nach INT-LOW
+ * den ersten SPI-Read starten, sonst timed der BNO aus und dropt die
+ * Advertise.  Wir warten daher nach INT nur minimal, damit die SH2-Lib
+ * gleich liest. */
+#define BNO_BOOT_DELAY_MS   1u
 
 static inline void cs_low(void)    { HAL_GPIO_WritePin(BNO_CS1_GPIO_Port,  BNO_CS1_Pin,  GPIO_PIN_RESET); }
 static inline void cs_high(void)   { HAL_GPIO_WritePin(BNO_CS1_GPIO_Port,  BNO_CS1_Pin,  GPIO_PIN_SET); }
@@ -92,11 +96,15 @@ static int hal_open(sh2_Hal_t *self)
     HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
     /* SPI1 kommt aus CubeMX in Mode 0 @24 MHz; BNO08x verlangt Mode 3
-     * und max 3 MHz (§4.2 BNO080 datasheet). APB2 = 96 MHz, /32 → 3 MHz. */
+     * und max 3 MHz (§4.2 BNO080 datasheet). APB2 = 96 MHz.
+     * Bringup: /128 → 750 kHz (BNO086-Bringup mit no-MISO-pullup auf dem
+     * Board braucht langsame Clock, sonst sampeln wir MISO-Threshold-
+     * Übergänge → "header valid, payload zeros"-Pattern). Hochsetzen sobald
+     * Bringup sauber läuft. */
     HAL_SPI_DeInit(&hspi1);
     hspi1.Init.CLKPolarity       = SPI_POLARITY_HIGH;
     hspi1.Init.CLKPhase          = SPI_PHASE_2EDGE;
-    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
     hspi1.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
     if (HAL_SPI_Init(&hspi1) != HAL_OK) {
         g_bno_stage = -11;
