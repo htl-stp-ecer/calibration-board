@@ -22,8 +22,7 @@ static const module_t *const MODULES[] = {
 };
 #define NUM_MODULES (sizeof(MODULES) / sizeof(MODULES[0]))
 
-static void run_setup(void)
-{
+static void run_setup(void) {
     for (size_t i = 0; i < NUM_MODULES; i++) {
         const module_t *m = MODULES[i];
         if (!m->enabled) {
@@ -34,8 +33,7 @@ static void run_setup(void)
     }
 }
 
-static void run_loop_iteration(void)
-{
+static void run_loop_iteration(void) {
     for (size_t i = 0; i < NUM_MODULES; i++) {
         const module_t *m = MODULES[i];
         if (!m->enabled || !m->loop) continue;
@@ -43,19 +41,18 @@ static void run_loop_iteration(void)
     }
 }
 
-void app_main(void)
-{
+void app_main(void) {
     /* SWO/ITM printf on PB3.  ST-LINK V2 (Clone) routet das in der Praxis
      * nicht durch; ST-LINK V3 schon.  UART4 ist die zuverlässige Quelle. */
     swo_init(HAL_RCC_GetHCLKFreq(), 1000000U);
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("[boot] calibration-board up, HCLK=%lu Hz\r\n",
-           (unsigned long)HAL_RCC_GetHCLKFreq());
+           (unsigned long) HAL_RCC_GetHCLKFreq());
 
     run_setup();
 
     while (1) {
-        run_loop_iteration();
         HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);
+        run_loop_iteration();
     }
 }

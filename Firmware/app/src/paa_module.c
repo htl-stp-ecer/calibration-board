@@ -42,5 +42,5 @@ const module_t paa_module = {
     .name    = "paa",
     .setup   = paa_setup,
     .loop    = paa_loop,
-    .enabled = true,
+    .enabled = false,
 };

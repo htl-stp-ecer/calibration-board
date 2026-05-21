@@ -50,7 +50,7 @@ volatile uint8_t  g_real_pkt_hdr[4]      = {0};
 volatile uint8_t  g_real_pkt_payload[32] = {0};
 volatile uint16_t g_real_pkt_len         = 0;
 
-#define BNO_INT_TIMEOUT_MS  300u
+#define BNO_INT_TIMEOUT_MS  600u  /* board measures ~364 ms boot time; 600 gives margin */
 /* WICHTIG: Datasheet sagt der Host muss innerhalb ~10 ms nach INT-LOW
  * den ersten SPI-Read starten, sonst timed der BNO aus und dropt die
  * Advertise.  Wir warten daher nach INT nur minimal, damit die SH2-Lib

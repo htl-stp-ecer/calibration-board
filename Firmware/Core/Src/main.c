@@ -100,7 +100,7 @@ int main(void)
   MX_SPI2_Init();
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);
+  //HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);
   app_main();
   /* USER CODE END 2 */
 

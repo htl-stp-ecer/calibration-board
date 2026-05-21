@@ -149,11 +149,16 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
     PA6     ------> SPI1_MISO
     PA7     ------> SPI1_MOSI
     */
-    GPIO_InitStruct.Pin = BNO_SCLK_Pin|BNO_MISO_Pin|BNO_MOSI_Pin;
+    GPIO_InitStruct.Pin = BNO_SCLK_Pin|BNO_MOSI_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* Pull MISO high when BNO isn't driving it — no pull-up on the PCB trace */
+    GPIO_InitStruct.Pin = BNO_MISO_Pin;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN SPI1_MspInit 1 */

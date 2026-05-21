@@ -31,9 +31,23 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5950d422-2d9c-4efd-af06-7b2c39a56bfc" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../IMU_Extendor_Board/IMU_Extendor_Board.kicad_pcb" beforeDir="false" afterPath="$PROJECT_DIR$/../IMU_Extendor_Board/IMU_Extendor_Board.kicad_pcb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../IMU_Extendor_Board/IMU_Extendor_Board.kicad_sch" beforeDir="false" afterPath="$PROJECT_DIR$/../IMU_Extendor_Board/IMU_Extendor_Board.kicad_sch" afterDir="false" />
+    <list default="true" id="5950d422-2d9c-4efd-af06-7b2c39a56bfc" name="Changes" comment="modifide the schematic to fix oscillator GND and in pcb; added ENV I2C pullpus in shematic">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.mxproject" beforeDir="false" afterPath="$PROJECT_DIR$/.mxproject" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Inc/gpio.h" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Inc/gpio.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Inc/spi.h" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Inc/spi.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Inc/usart.h" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Inc/usart.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Inc/usb_otg.h" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Inc/usb_otg.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Src/gpio.c" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Src/gpio.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Src/main.c" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Src/main.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Src/spi.c" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Src/spi.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Src/usart.c" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Src/usart.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Core/Src/usb_otg.c" beforeDir="false" afterPath="$PROJECT_DIR$/Core/Src/usb_otg.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Firmware.ioc" beforeDir="false" afterPath="$PROJECT_DIR$/Firmware.ioc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/app.c" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/app.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/bno_module.c" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/bno_module.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/paa_module.c" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/paa_module.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/drivers/bno08x/src/bno08x.c" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/bno08x/src/bno08x.c" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,10 +57,15 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug - Debug" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Release" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
     <option name="ROOT_SYNC" value="DONT_SYNC" />
+    <option name="UPDATE_TYPE" value="REBASE" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/drivers/bno08x/inc/bno08x.h" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/drivers/bno08x/src/bno08x.c" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="rin4i6Tu" />
@@ -118,8 +137,17 @@
       <workItem from="1779291645441" duration="23000" />
       <workItem from="1779291676923" duration="174000" />
       <workItem from="1779291858119" duration="3728000" />
-      <workItem from="1779376204798" duration="1000" />
+      <workItem from="1779376204798" duration="8135000" />
     </task>
+    <task id="LOCAL-00001" summary="modifide the schematic to fix oscillator GND and in pcb; added ENV I2C pullpus in shematic">
+      <option name="closed" value="true" />
+      <created>1779376322845</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1779376322845</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -131,12 +159,16 @@
     <isAutomaticReloadCMake value="true" />
     <isAutomaticBootstrapAfterUpdate value="false" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="modifide the schematic to fix oscillator GND and in pcb; added ENV I2C pullpus in shematic" />
+    <option name="LAST_COMMIT_MESSAGE" value="modifide the schematic to fix oscillator GND and in pcb; added ENV I2C pullpus in shematic" />
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/app/src/app.c</url>
-          <line>50</line>
+          <line>56</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
