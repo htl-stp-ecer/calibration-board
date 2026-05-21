@@ -7,8 +7,11 @@ muss mit Elektroniker durchgegangen werden.
 ## Hintergrund — Software-Status
 
 Firmware steht für Bringup bereit (`Firmware/drivers/bno08x/` + `app/`).
-Solange die Hardware-Punkte unten nicht abgehakt sind, läuft BNO086 nicht
-zuverlässig. Software erkennt den Zustand und blinkt die USER-LED entsprechend:
+Aktueller Stand nach dem .ioc-Fix (PB2.PinState=GPIO_PIN_SET) und HSI-
+Workaround: BNO086 bootet in den App-Mode, `sh2_open` läuft erfolgreich
+durch (SHTP-Handshake OK, INT-Leitung funktioniert elektrisch), aber
+`sh2_getProdIds` kehrt nicht zurück → siehe Issue 2 (neu gefasst).
+Software erkennt den Zustand und blinkt die USER-LED entsprechend:
 
 | LED-Muster | Bedeutung |
 |---|---|
@@ -50,57 +53,72 @@ sobald die Hardware sauber ist.
 
 Wahrscheinlichste Ursache: kalte/fehlende Löt­stelle an Y202 oder R203.
 
-## Issue 2 — BNO086 INT-Leitung kommt nicht durch (Hauptproblem)
+## Issue 2 — BNO086 `sh2_getProdIds` kehrt nicht zurück
 
-**Symptom:** BNO086 reagiert elektrisch auf SPI (RAW-Probe direkt nach Reset
-liefert nicht-trivialer MISO-Output), aber **PC4 (BNO_INT) bleibt durchgehend
-HIGH**, auch nach Reset, auch nach mehreren hundert Millisekunden Warten.
-Damit funktioniert der SH2/SHTP-Protokoll-Handshake nicht — INT ist die einzige
-Flow-Control der CEVA `sh2`-Lib.
+**Status:** Reframed nach Bringup-Session 2026-05-21. Vorher als
+"INT-Leitung kommt nicht durch" diagnostiziert — das war ein Folge­symptom
+von Issue 3 (BNO im Bootloader-Mode). Mit `.ioc`-Fix (PB2.PinState=SET) ist
+INT elektrisch nachgewiesen funktional.
 
-Diagnose-Werte nach Init-Versuch:
+**Aktuelle Symptome:**
 
 ```
-g_int_after_reset    = 0   (INT high = nicht asserted)
-g_int_ms_to_assert   = 0   (INT ging in 300 ms Timeout nie low)
-g_first_read_buf[0]  = F0, F8, FC oder ähnlich, gefolgt von Nullen
-g_first_read_skipped = variabel (0–32) leading 0xFF-Bytes
+g_bno_stage             = 20      (post sh2_open, in sh2_getProdIds)
+g_sh2_open_rc           = 0       (SHTP-Setup erfolgreich)
+g_sh2_prodids_rc        = 0xCAFE  (Sentinel — sh2_getProdIds nie zurück)
+g_int_after_reset       = 0       (INT korrekt LOW direkt nach Reset)
+g_int_ms_to_assert      = 0
+g_first_read_buf        = {0,0,…} (saubere Frames, kein Idle-Geklingel)
+g_exti4_falling_count   = ~417k bei erstem Halt, danach STILL
 ```
 
-Das Muster — erstes Byte `Fx`, dann nur Nullen — ist konsistent mit MISO,
-das gerade von Idle-High (hi-Z + Pullup) auf Aktiv-Low übergeht **während des
-ersten Bytes**: obere Bits noch `1`, untere `0`. Keine konsistente SHTP-Länge,
-keine valide Channel-ID — kein echtes SH2-Paket. Damit ist das Frame-Sync von
-SHTP nie zu erreichen und SHTP läuft nie an.
+Heißt: BNO sendet beim Boot den Advertise-Burst (EXTI feuert massiv),
+SHTP-Handshake klappt. Sobald die Lib aber `getProdIds` schickt, bekommt
+sie keine Antwort mehr (EXTI-Counter steht).
+
+**Plausibelste Restursache: 32 kHz-Clock fehlt (Y401 / R406)**
+
+Die BNO086 braucht die externe 32.768 kHz-Referenz an XIN32, sonst läuft
+die SH2-App-Firmware unvollständig — Advertise-Burst kommt aus dem ROM-
+Bootloader noch durch, aber sobald die Sensor-/App-Logik selbst antworten
+müsste (z. B. auf `getProdIds`), passiert nichts. Klassisches Symptom.
 
 **Was zu prüfen ist:**
 
 | Punkt | Wie | Erwartung |
 |---|---|---|
-| **Durchgang PC4 ↔ U401 Pin 14 (H_INT)** | Multimeter Durchgang/Widerstand zwischen STM32-Pin PC4 und BNO086-Pin 14 | < 1 Ω. Wenn unterbrochen: kalte Lötstelle oder Riss in Leiterbahn. |
-| **U401 Pin 14 selbst** | Lupe über das BGA-/QFN-Pad | Kein Lift, kein Bridge, nicht ausgetrocknet. |
-| **U401 VDD / VDDIO** | Multimeter Pin 3 + Pin 28 ↔ GND | 3.3 V stabil. |
-| **U401 Reset (Pin 11) und NBOOT (Pin 4)** | Multimeter im Betrieb messen | Pin 11 = 3.3 V (nicht im Reset), Pin 4 = 3.3 V (nicht im Bootloader). |
-| **R406 (0 Ω) zwischen Y401 Pin 3 und BNO086 Pin 27 (XIN32)** | Lupe + Durchgang | Best­ückt und durchgängig. Ohne diesen Widerstand bekommt der BNO keinen 32 kHz-Clock und der SH2-Boot scheitert oder läuft instabil. |
-| **Y401 Output am Pin 3** | Scope nötig (~32 kHz CMOS-Rechteck) | Wenn Y401 nicht läuft: Pin 1 (Tri-State EN) prüfen — sollte offen oder VDD sein. R404 ist DNP, also sollte EN floaten und damit per internem Pull-up enabled sein. |
-| **R501–R505 (BNO-Bus-Pullups / Series)** | BOM checken | Alle best­ückt? Falsche Werte könnten SPI verzerren. |
+| **R406 (0 Ω) zwischen Y401 Pin 3 und BNO086 Pin 27 (XIN32)** | Lupe + DMM-Durchgang | Best­ückt, < 1 Ω. **Hauptverdacht.** |
+| **Y401 Output am Pin 3** | Scope (~32 kHz CMOS-Rechteck) | Wenn tot: Pin 1 (Tri-State EN) prüfen — offen oder VDD. R404 ist DNP, EN sollte intern hochgepullt sein. |
+| **Y401 VDD (Pin 4)** | DMM ↔ GND | 3.3 V. |
+| **R501–R505 (BNO-Bus-Pullups / Series)** | BOM + Durchgang | Alle best­ückt? Falsche Werte würden zwar nicht erst nach `sh2_open` Probleme machen, aber Vollständigkeit. |
+| **U401 VDD + VDDIO (Pin 3 + 28)** | DMM ↔ GND | 3.3 V stabil. |
 
-Wenn der INT-Pfad elektrisch unterbrochen ist, gibt es keinen robusten
-Software-Workaround — die `sh2`-Lib braucht INT zwingend für Frame-Sync.
+Wenn der 32k-Clock OK ist und das Symptom bleibt, weiter eingrenzen mit
+einer SPI-Trace (Saleae o.ä.) auf MOSI/MISO/CS/CLK — schauen ob der
+GetProdIds-Request überhaupt sauber rausgeht und ob der BNO ein NAK/Empty-
+Read zurückgibt.
 
-## Issue 3 — `BNO_NBOOT` an PB2 wird im CubeMX-Init auf LOW gezogen
+## Issue 3 — `BNO_NBOOT` an PB2 wird im CubeMX-Init auf LOW gezogen ✅ FIXED
 
-**Symptom:** CubeMX setzt im Reset-State alle GPIOB-Output-Pins inklusive
-PB2 auf LOW. BNO086 Pin 4 (`BOOTN`) ist active-low — LOW heißt "in
-Bootloader". Solange wir den BNO nicht aktiv aus dem Bootloader rausholen,
-sendet er kein normales Advertise.
+**Status:** Behoben in der `.ioc` (`PB2.PinState=GPIO_PIN_SET`) — PB2 ist
+ab `MX_GPIO_Init()` HIGH, lange vor `nrst_high()`. Damit sampelt der BNO
+beim eigenen Reset-Rising-Edge BOOTN als HIGH und bootet in den App-Mode.
+Verifiziert in Bringup-Session 2026-05-21: nach dem Fix lief `sh2_open`
+erfolgreich durch, INT-Leitung asserted korrekt.
 
-**Status:** Im aktuellen Firmware-Stand wird PB2 in `bno08x_init` (HAL-Open)
-explizit auf HIGH gezogen. Wenn die `.ioc`-Konfiguration jemals geändert wird,
-sollte PB2 dort default-HIGH bekommen, damit der BNO direkt korrekt bootet.
+**Historisches Symptom (jetzt verschwunden):** Vor dem Fix war PB2 nach
+Reset LOW (BOOTN active-low → "in Bootloader"). Der BNO sendete dann
+nur den Bootloader-Advertise und reagierte nicht auf SH2-Protokoll-Pakete
+→ INT blieb dauerhaft HIGH → wurde fälschlich als "INT-Leitung kaputt"
+diagnostiziert (siehe Issue 2 alte Fassung).
 
 Schaltplan-Hinweis: R409 (10 kΩ) zieht BNO_NBOOT zwar auf 3V3, das wird
-aber von PB2 (push-pull Output) überschrieben.
+aber von PB2 (push-pull Output) überschrieben — `.ioc`-Default ist
+deshalb load-bearing, nicht nur cosmetic.
+
+Backup im `bno08x_init` (`HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET)`
+direkt vor `nrst_low()`) bleibt drin, falls das `.ioc`-Setting bei einem
+zukünftigen Regen verloren geht.
 
 ## Issue 4 — UART4 (PA0/PA1) ist nur über externen USB-UART-Adapter nutzbar
 
@@ -128,11 +146,16 @@ BNO sauber läuft, sonst verteilt sich die Fehlersuche auf zwei IMUs.
 
 ## Status / Reihenfolge
 
-1. **Issue 2 (INT-Leitung BNO)** — größter Showstopper, ohne Fix kein BNO.
-2. **Issue 1 (HSE-Quarz)** — Workaround aktiv, sollte trotzdem nachgelötet
-   werden, weil HSE-Genauigkeit für Sensor-Timing besser ist als HSI.
-3. **Issue 4 (UART-Adapter)** — Quality-of-Life, nicht blockierend.
-4. **Issue 5 (USB-C)** — wenn standalone-Betrieb gewünscht.
+1. **Issue 2 (BNO `getProdIds` hängt)** — verdacht Y401 / 32 kHz-Clock,
+   Hardware-Check nötig.
+2. **Issue 1 (HSE-Quarz)** — Workaround aktiv (HSI in `main.c`,
+   nicht-`.ioc`), sollte trotzdem nachgelötet werden, weil HSE-Genauigkeit
+   für Sensor-Timing besser ist als HSI. ⚠️ Workaround geht bei jedem
+   CubeMX-Regen verloren — manuell wieder einsetzen oder `.ioc` auf HSI
+   umstellen.
+3. **Issue 3 (BOOTN)** ✅ behoben in `.ioc` + Firmware-Backup.
+4. **Issue 4 (UART-Adapter)** — Quality-of-Life, nicht blockierend.
+5. **Issue 5 (USB-C)** — wenn standalone-Betrieb gewünscht.
 
 Sobald Issue 2 behoben ist, sollte die BNO-LED schnell blinken (gleiche Firmware
 flashen mit `Firmware/scripts/flash.sh`). Dann Product IDs via GDB lesen:

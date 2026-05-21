@@ -28,6 +28,27 @@ volatile uint8_t  g_first_read_buf[16];
 volatile uint8_t  g_first_read_skipped  = 0;
 volatile uint32_t g_exti4_falling_count = 0;
 volatile uint32_t g_exti4_first_tick = 0;
+volatile uint32_t g_write_calls         = 0;
+volatile uint32_t g_writes_ok           = 0;
+volatile uint32_t g_writes_ack_int      = 0;  /* INT-LOW kam vor 100 ms Timeout */
+volatile uint32_t g_reset_events        = 0;
+volatile uint8_t  g_last_read_chan      = 0xFF;
+volatile uint16_t g_last_read_len       = 0;
+/* Hal_read Exit-Pfade */
+volatile uint32_t g_read_skip_int_high  = 0;  /* INT high, nicht 64. Call */
+volatile uint32_t g_read_hdr_ff         = 0;  /* alle 64 Bytes 0xFF */
+volatile uint32_t g_read_hdr_zero       = 0;  /* hdr[0]=0 → kein Paket */
+volatile uint32_t g_read_pkt_too_big    = 0;
+volatile uint32_t g_read_spi_fail       = 0;
+/* Hal_write Exit-Pfade */
+volatile uint32_t g_write_int_gated     = 0;
+volatile uint32_t g_write_spi_fail      = 0;
+/* Letzter unverarbeiteter hdr beim hdr_zero / hdr_ff exit */
+volatile uint8_t  g_last_garbage_hdr[4] = {0};
+/* Echte (non-zero-len) Packet-Header + erste Payload-Bytes für Forensik */
+volatile uint8_t  g_real_pkt_hdr[4]      = {0};
+volatile uint8_t  g_real_pkt_payload[32] = {0};
+volatile uint16_t g_real_pkt_len         = 0;
 
 #define BNO_INT_TIMEOUT_MS  300u
 #define BNO_BOOT_DELAY_MS   500u
@@ -136,6 +157,7 @@ static int hal_read(sh2_Hal_t *self, uint8_t *pBuf, unsigned len, uint32_t *t_us
      * damit der SH2-Stack zumindest eine Chance hat. */
     bool int_now = int_asserted();
     if (!int_now && (g_read_calls % 64) != 0) {
+        g_read_skip_int_high++;
         return 0;
     }
 
@@ -146,21 +168,23 @@ static int hal_read(sh2_Hal_t *self, uint8_t *pBuf, unsigned len, uint32_t *t_us
     uint8_t zero = 0;
     uint8_t hdr[4] = {0};
     if (HAL_SPI_TransmitReceive(&hspi1, &zero, &hdr[0], 1, 50) != HAL_OK) {
-        cs_high(); return 0;
+        g_read_spi_fail++; cs_high(); return 0;
     }
     unsigned skipped = 0;
     while (hdr[0] == 0xFF && skipped < 64) {
         if (HAL_SPI_TransmitReceive(&hspi1, &zero, &hdr[0], 1, 50) != HAL_OK) {
-            cs_high(); return 0;
+            g_read_spi_fail++; cs_high(); return 0;
         }
         skipped++;
     }
     if (hdr[0] == 0xFF) {
+        g_read_hdr_ff++;
+        for (unsigned i = 0; i < 4; i++) g_last_garbage_hdr[i] = hdr[i];
         cs_high();
         return 0;
     }
     if (HAL_SPI_TransmitReceive(&hspi1, &zero, &hdr[1], 3, 50) != HAL_OK) {
-        cs_high(); return 0;
+        g_read_spi_fail++; cs_high(); return 0;
     }
 
     if (!g_first_read_buf[0] && !g_first_read_buf[1]) {
@@ -169,7 +193,14 @@ static int hal_read(sh2_Hal_t *self, uint8_t *pBuf, unsigned len, uint32_t *t_us
     }
 
     unsigned pkt_len = (unsigned)hdr[0] | (((unsigned)hdr[1] & 0x7Fu) << 8);
-    if (pkt_len == 0 || pkt_len > len) {
+    if (pkt_len == 0) {
+        g_read_hdr_zero++;
+        for (unsigned i = 0; i < 4; i++) g_last_garbage_hdr[i] = hdr[i];
+        cs_high();
+        return 0;
+    }
+    if (pkt_len > len) {
+        g_read_pkt_too_big++;
         cs_high();
         return 0;
     }
@@ -187,6 +218,14 @@ static int hal_read(sh2_Hal_t *self, uint8_t *pBuf, unsigned len, uint32_t *t_us
     }
     cs_high();
     g_reads_with_data++;
+    g_last_read_chan = (uint8_t)(hdr[2] & 0xFFu);
+    g_last_read_len  = (uint16_t)pkt_len;
+    /* Letztes echtes Paket archivieren (Header + erste 32 Payload-Bytes) */
+    for (unsigned i = 0; i < 4; i++) g_real_pkt_hdr[i] = hdr[i];
+    g_real_pkt_len = (uint16_t)pkt_len;
+    unsigned copy = (pkt_len > 4) ? (pkt_len - 4) : 0;
+    if (copy > sizeof(g_real_pkt_payload)) copy = sizeof(g_real_pkt_payload);
+    for (unsigned i = 0; i < copy; i++) g_real_pkt_payload[i] = pBuf[4 + i];
     return (int)pkt_len;
 }
 
@@ -195,21 +234,28 @@ static int hal_write(sh2_Hal_t *self, uint8_t *pBuf, unsigned len)
     (void)self;
     if (len == 0 || len > sizeof(s_rx_dump)) return 0;
 
+    g_write_calls++;
+
     /* Wenn INT asserted ist, hat der Chip noch was zu senden — erst lesen. */
-    if (int_asserted()) return 0;
+    if (int_asserted()) { g_write_int_gated++; return 0; }
 
     /* WAKE/PS0 als Wake-Request, kurzes Timeout-Warten auf INT. */
     wake_low();
     bool ready = wait_int_low(100);
     wake_high();
+    if (ready) g_writes_ack_int++;
     /* Ohne INT-Bestätigung trotzdem weiter (HW-Workaround). */
-    (void)ready;
 
     cs_low();
     HAL_StatusTypeDef st = HAL_SPI_TransmitReceive(&hspi1, pBuf, s_rx_dump,
                                                    (uint16_t)len, 200);
     cs_high();
-    return (st == HAL_OK) ? (int)len : 0;
+    if (st == HAL_OK) {
+        g_writes_ok++;
+        return (int)len;
+    }
+    g_write_spi_fail++;
+    return 0;
 }
 
 static uint32_t hal_getTimeUs(sh2_Hal_t *self)
@@ -228,14 +274,8 @@ static sh2_Hal_t s_hal = {
 
 static volatile bool s_reset_seen = false;
 
-/* EXTI4 IRQ vector — CubeMX hat ihn nicht angelegt.  Wir definieren den
- * Handler hier; HAL_GPIO_EXTI_IRQHandler decodet die Line und ruft unten
- * den Callback. */
-void EXTI4_IRQHandler(void)
-{
-    HAL_GPIO_EXTI_IRQHandler(BNO_INT_Pin);
-}
-
+/* EXTI4_IRQHandler liegt in Core/Src/stm32f7xx_it.c (CubeMX-generiert);
+ * der ruft HAL_GPIO_EXTI_IRQHandler → diesen Callback hier. */
 void HAL_GPIO_EXTI_Callback(uint16_t pin)
 {
     if (pin == BNO_INT_Pin) {
@@ -249,7 +289,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t pin)
 static void event_cb(void *cookie, sh2_AsyncEvent_t *ev)
 {
     (void)cookie;
-    if (ev->eventId == SH2_RESET) s_reset_seen = true;
+    if (ev->eventId == SH2_RESET) { s_reset_seen = true; g_reset_events++; }
 }
 
 bno08x_status_t bno08x_init(void)
