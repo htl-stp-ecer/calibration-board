@@ -22,6 +22,7 @@
 #include "stm32f7xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "usb_otg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -214,4 +215,10 @@ void EXTI4_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
+/* USB OTG_FS global interrupt — NVIC isn't enabled in CubeMX, we enable it
+ * from MX_USB_DEVICE_Init(). */
+void OTG_FS_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+}
 /* USER CODE END 1 */

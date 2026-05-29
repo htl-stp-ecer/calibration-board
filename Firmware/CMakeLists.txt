@@ -57,9 +57,18 @@ file(GLOB SH2_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/sh2/*.c"
 )
 
+# Third-party: ST USB Device library (Core + CDC class) — vendored copy
+# from STM32Cube_FW_F7 V1.17.4 since the .ioc does not yet enable the
+# USB_DEVICE middleware.
+file(GLOB USBD_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/core/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/cdc/src/*.c"
+)
+
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${USER_SOURCES}
     ${SH2_SOURCES}
+    ${USBD_SOURCES}
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -67,6 +76,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/bno08x/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/paa5100/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/sh2
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/core/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/cdc/inc
 )
 
 # Add project symbols (macros)

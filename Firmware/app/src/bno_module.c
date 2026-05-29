@@ -1,46 +1,48 @@
-#include <stdio.h>
-
 #include "main.h"
 #include "stm32f7xx_hal.h"
 
 #include "module.h"
 #include "bno08x.h"
 
-static bno08x_status_t s_init_status = BNO08X_ERR_IO;
-static bno08x_quat_t   s_last_quat;
-static uint32_t        s_last_print_tick;
+/* App-Test für BNO:
+ *   USER_LED 1 Hz blinkt  → init failed
+ *   USER_LED konstant an  → init OK, im Loop wird mit der BNO geredet
+ * Sonst keine Logik. */
 
-volatile int g_bno_init_status = 0xDEADBEEF;
+static bool       s_initialized;
+static bno08x_quat_t s_quat;
+static uint32_t   s_blink_tick;
+static bool       s_blink_state;
 
 static void bno_setup(void)
 {
-    printf("[bno] init...\r\n");
-    s_init_status = bno08x_init();
-    g_bno_init_status = (int)s_init_status;
-    printf("[bno] init -> %d\r\n", (int)s_init_status);
+    HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
 }
 
 static void bno_loop(void)
 {
-    if (s_init_status != BNO08X_OK) return;
-
-    /* Pro Sekunde max einen Read + Print. */
-    uint32_t now = HAL_GetTick();
-    if ((now - s_last_print_tick) < 1000u) return;
-    s_last_print_tick = now;
-
-    if (bno08x_read_quat(&s_last_quat) == BNO08X_OK) {
-        printf("[bno] q=(%.3f, %.3f, %.3f, %.3f) acc=%.3f rad\r\n",
-               (double)s_last_quat.w, (double)s_last_quat.x,
-               (double)s_last_quat.y, (double)s_last_quat.z,
-               (double)s_last_quat.accuracy_rad);
+    if (!s_initialized) {
+        if (bno08x_init() == BNO08X_OK) {
+            s_initialized = true;
+            HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
+        } else {
+            uint32_t now = HAL_GetTick();
+            if ((now - s_blink_tick) >= 1000u) {
+                s_blink_tick  = now;
+                s_blink_state = !s_blink_state;
+                HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin,
+                                  s_blink_state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            }
+        }
+        return;
     }
+
+    (void)bno08x_read_quat(&s_quat);
 }
 
-/* enabled=false bis Issue 2 (CS-Pfad PA4↔BNO Pin 18) hardwareseitig geklärt. */
 const module_t bno_module = {
     .name    = "bno",
     .setup   = bno_setup,
     .loop    = bno_loop,
-    .enabled = false,
+    .enabled = true,
 };

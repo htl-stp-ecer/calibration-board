@@ -5,6 +5,7 @@
 
 #include "module.h"
 #include "paa5100.h"
+#include "usbd_cdc_if.h"
 
 static paa5100_status_t s_init_status = PAA5100_ERR_IO;
 static uint32_t         s_last_print_tick;
@@ -34,7 +35,11 @@ static void paa_loop(void)
     paa5100_motion_t m;
     if (paa5100_read_motion(&m) == PAA5100_OK) {
         printf("[paa t=%lu] dx=%6d dy=%6d squal=%3u motion=0x%02x\r\n",
-               (unsigned long)s_tick++, m.dx, m.dy, m.squal, m.motion);
+               (unsigned long)s_tick, m.dx, m.dy, m.squal, m.motion);
+        usb_cdc_printf("paa,%lu,%d,%d,%u,%u\r\n",
+                       (unsigned long)s_tick, m.dx, m.dy,
+                       (unsigned)m.squal, (unsigned)m.motion);
+        s_tick++;
     }
 }
 

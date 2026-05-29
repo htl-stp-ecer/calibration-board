@@ -15,8 +15,12 @@
  * den Eintrag zu löschen. */
 extern const module_t bno_module;
 extern const module_t paa_module;
+extern const module_t usb_module;
 
+/* usb_module FIRST: setup() starts the CDC stack, so it's available when
+ * the sensor modules later try to push samples. */
 static const module_t *const MODULES[] = {
+    &usb_module,
     &bno_module,
     &paa_module,
 };
@@ -56,6 +60,5 @@ void app_main(void)
 
     while (1) {
         run_loop_iteration();
-        HAL_GPIO_TogglePin(USER_LED_GPIO_Port, USER_LED_Pin);
     }
 }
