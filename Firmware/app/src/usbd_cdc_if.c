@@ -14,7 +14,7 @@
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 #define APP_RX_BUF_SIZE   CDC_DATA_FS_OUT_PACKET_SIZE
-#define APP_TX_RING_SIZE  4096U   /* power of 2 — drops oldest line on overflow */
+#define APP_TX_RING_SIZE  16384U  /* power of 2 — Bursts bei voller ICM-Rate */
 
 static uint8_t s_rx_buf[APP_RX_BUF_SIZE];
 
@@ -55,8 +55,14 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 
 static int8_t CDC_Receive_FS(uint8_t *Buf, uint32_t *Len)
 {
-    (void)Buf; (void)Len;
-    /* No host→device protocol yet — re-arm and drop the data. */
+    /* Host → Device: in den Frame-Parser füttern.  Aufruf erfolgt aus
+     * USB-Interrupt-Kontext — die handler in framing.c müssen kurz sein
+     * (kein Flash-Write hier; das wird vom Main-Loop-Modul übernommen,
+     * das via Flag aufgewacht wird). */
+    extern void frame_feed_rx(const uint8_t *data, uint32_t len);
+    if (Len && *Len > 0) {
+        frame_feed_rx(Buf, *Len);
+    }
     USBD_CDC_SetRxBuffer(&hUsbDeviceFS, s_rx_buf);
     USBD_CDC_ReceivePacket(&hUsbDeviceFS);
     return USBD_OK;
@@ -101,6 +107,24 @@ uint32_t usb_cdc_write(const uint8_t *buf, uint32_t len)
 
     uint32_t avail = ring_free();
     if (len > avail) len = avail;
+
+    for (uint32_t i = 0; i < len; i++) {
+        s_tx_ring[(s_tx_head + i) & (APP_TX_RING_SIZE - 1U)] = buf[i];
+    }
+    s_tx_head = (s_tx_head + len) & (APP_TX_RING_SIZE - 1U);
+
+    usb_cdc_tx_pump();
+    return len;
+}
+
+/* Atomisches Schreiben: schreibt alles-oder-nichts. Wichtig für binäre
+ * Frames — ein Teil-Frame zerschießt den Host-Decoder bis zum nächsten
+ * Sync.  Bei voller Ring wird das Frame komplett verworfen und 0
+ * zurückgegeben; der Caller weiß damit dass ein Drop passiert ist. */
+uint32_t usb_cdc_write_atomic(const uint8_t *buf, uint32_t len)
+{
+    if (!usb_cdc_is_ready()) return 0;
+    if (len > ring_free()) return 0;
 
     for (uint32_t i = 0; i < len; i++) {
         s_tx_ring[(s_tx_head + i) & (APP_TX_RING_SIZE - 1U)] = buf[i];

@@ -44,5 +44,5 @@ const module_t bno_module = {
     .name    = "bno",
     .setup   = bno_setup,
     .loop    = bno_loop,
-    .enabled = true,
+    .enabled = false,  /* BNO08x defekt — übergangsweise aus */
 };

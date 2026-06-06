@@ -75,6 +75,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/app/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/bno08x/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/drivers/paa5100/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/icm42688p/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/sh2
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/core/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/usbd/cdc/inc

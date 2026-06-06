@@ -1,0 +1,45 @@
+[Unit]
+Description=Raccoon Calibration-Board → raccoon-transport bridge
+# Sobald das Board enumeriert (udev-Trigger), versuchen wir es zu öffnen.
+# Aber: wir laufen auch ohne Board (publishen "disconnected"-Status).
+# Deshalb KEINE harte Hardware-Abhängigkeit.
+After=network.target
+# Restart-Backoff im [Unit] (nicht [Service]) — systemd's korrekte Stelle.
+StartLimitIntervalSec=30
+StartLimitBurst=10
+
+[Service]
+Type=simple
+# CAP_NET_ADMIN nicht nötig; dialout für USB-Serial.
+DynamicUser=no
+# User/Group werden von install.sh eingesetzt (Default: aufrufender User).
+User=__CALIB_BRIDGE_USER__
+Group=dialout
+
+# Umgebungs-Defaults — User kann via /etc/default/raccoon-calib-bridge
+# überschreiben.
+EnvironmentFile=-/etc/default/raccoon-calib-bridge
+Environment=CALIB_BRIDGE_LOG=info
+
+ExecStart=/usr/local/bin/raccoon-calib-bridge
+
+Restart=always
+RestartSec=2
+
+# Hardening — wir machen nur USB-Serial + LCM/Multicast.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Multicast kommt aus dem default Netzwerk-Namespace; nicht abdrehen.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# /dev/ttyACM* Zugriff regeln wir über Group=dialout — systemd
+# DeviceAllow= mit "char-ttyACM" funktioniert nicht (gibt keine
+# /proc/devices Klasse mit dem Namen, ttyACM ist dynamic-major), und
+# kombiniert mit DevicePolicy=closed sperrt das den Port komplett.
+# Posix-Gruppen-Permission reicht — /dev/ttyACM0 ist crw-rw---- root:dialout.
+
+[Install]
+WantedBy=multi-user.target

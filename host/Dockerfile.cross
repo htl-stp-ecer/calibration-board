@@ -1,0 +1,34 @@
+# Native (non-emulated) ARM64 cross-compile builder.  Läuft auf x86_64
+# mit aarch64-linux-gnu-g++, also kein QEMU.
+#
+# Wir basieren auf debian:trixie damit die produzierten Binaries exakt
+# zur glibc auf dem Pi (Debian 13 Trixie) passen.
+FROM debian:trixie
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Cross-toolchain + Build-Tools.  Kein eigenes ARM-Userland nötig, weil
+# CMake + Ninja x86 laufen und nur die Compiler aarch64 produzieren.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc-aarch64-linux-gnu \
+        g++-aarch64-linux-gnu \
+        binutils-aarch64-linux-gnu \
+        cmake \
+        ninja-build \
+        git \
+        ccache \
+        pkg-config \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CCACHE_DIR=/ccache \
+    CCACHE_MAXSIZE=2G \
+    CCACHE_COMPRESS=1 \
+    CCACHE_BASEDIR=/src \
+    CCACHE_NOHASHDIR=1 \
+    CCACHE_COMPILERCHECK=content
+
+RUN git config --global --add safe.directory '*'
+
+WORKDIR /src
+CMD ["/bin/bash"]

@@ -15,6 +15,9 @@
  * den Eintrag zu löschen. */
 extern const module_t bno_module;
 extern const module_t paa_module;
+extern const module_t paa_cal_module;
+extern const module_t icm_module;
+extern const module_t status_module;
 extern const module_t usb_module;
 
 /* usb_module FIRST: setup() starts the CDC stack, so it's available when
@@ -23,6 +26,9 @@ static const module_t *const MODULES[] = {
     &usb_module,
     &bno_module,
     &paa_module,
+    &paa_cal_module,
+    &icm_module,
+    &status_module,
 };
 #define NUM_MODULES (sizeof(MODULES) / sizeof(MODULES[0]))
 

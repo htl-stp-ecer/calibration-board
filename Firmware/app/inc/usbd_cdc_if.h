@@ -19,6 +19,11 @@ bool usb_cdc_is_ready(void);
  * enumerated yet).  Safe to call from main loop only — not ISR. */
 uint32_t usb_cdc_write(const uint8_t *buf, uint32_t len);
 
+/* Wie usb_cdc_write, aber atomic: schreibt alles-oder-nichts.  Bei voller
+ * Ring kommt 0 zurück und keine Bytes werden akzeptiert.  Für binäre
+ * Frames Pflicht. */
+uint32_t usb_cdc_write_atomic(const uint8_t *buf, uint32_t len);
+
 /* Convenience: printf-style line over the VCP. */
 int usb_cdc_printf(const char *fmt, ...);
 

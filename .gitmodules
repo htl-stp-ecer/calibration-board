@@ -1,3 +1,6 @@
 [submodule "Firmware/lib/sh2"]
 	path = Firmware/lib/sh2
 	url = https://github.com/ceva-dsp/sh2.git
+[submodule "host/third_party/raccoon-transport"]
+	path = host/third_party/raccoon-transport
+	url = git@github.com:htl-stp-ecer/raccoon-transport.git
