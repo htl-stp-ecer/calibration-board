@@ -151,7 +151,8 @@ namespace calib_bridge
                 std::memcpy(&s.gz_dps,     p + 24, 4);
                 std::memcpy(&s.bias_x_dps, p + 28, 4);
                 std::memcpy(&s.bias_y_dps, p + 32, 4);
-                uint8_t flags = p[36];
+                std::memcpy(&s.bias_z_dps, p + 36, 4);
+                uint8_t flags = p[40];
                 s.at_rest         = (flags & 0x01) != 0;
                 s.bias_persisted  = (flags & 0x02) != 0;
                 if (orient_cb_) orient_cb_(s);

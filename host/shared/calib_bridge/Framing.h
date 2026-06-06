@@ -30,7 +30,7 @@ namespace calib_bridge::framing
     inline constexpr uint8_t PAYLOAD_LEN_PAA             = 10;
     inline constexpr uint8_t PAYLOAD_LEN_STATUS          = 20;
     inline constexpr uint8_t PAYLOAD_LEN_PAA_CAL         = 13;
-    inline constexpr uint8_t PAYLOAD_LEN_ORIENTATION     = 37;
+    inline constexpr uint8_t PAYLOAD_LEN_ORIENTATION     = 41;
     inline constexpr uint8_t PAYLOAD_LEN_CMD_SET_PAA_CAL = 12;
 
     inline constexpr uint8_t HDR_BYTES   = 7;   // sync + type + len + t_ms
@@ -99,7 +99,7 @@ namespace calib_bridge::framing
         uint32_t t_ms = 0;
         float    qw = 1, qx = 0, qy = 0, qz = 0;
         float    gx_dps = 0, gy_dps = 0, gz_dps = 0;
-        float    bias_x_dps = 0, bias_y_dps = 0;
+        float    bias_x_dps = 0, bias_y_dps = 0, bias_z_dps = 0;
         bool     at_rest = false;
         bool     bias_persisted = false;
     };

@@ -7,39 +7,33 @@
  * MADGWICK_BETA:
  *   Filter-Gain.  Höher = Accel-Anteil stärker (schnellere Korrektur
  *   von Roll/Pitch, aber empfindlicher gegen Bewegungs-Beschleunigung).
- *   0.05–0.1 typisch für 6-DOF ohne Mag.  Bei Bot-Anwendung mit viel
- *   linearer Beschleunigung würde man dynamisch reduzieren — wir
- *   bleiben pragmatisch.
+ *   0.05–0.1 typisch für 6-DOF ohne Mag.
  *
  * BIAS_EMA_ALPHA:
  *   Lernrate für den Bias.  α = 0.001 bei 1 kHz → effektive Zeit-
  *   konstante ~1 s.  Während at-rest 5 s = 5000 Updates konvergiert das
  *   sauber.
  *
- * STATS_EMA_ALPHA:
- *   Lernrate für die laufenden Mean/Varianz-Schätzer für die at-rest
- *   Detection.  α = 1e-4 bei 1 kHz → effektive Zeitkonstante ~10 s, d. h.
- *   die Statistik bezieht sich auf die letzten ~10 s an Samples.  Das
- *   ist genau das was der User wollte: "10 s relative window".
+ * REST_BUF_SIZE / REST_SUBSAMPLE_DECIM:
+ *   Wir behalten einen 10s-Ring-Buffer der Roh-Samples (downgesampled
+ *   auf 100 Hz, also 1000 Slots à 4 Byte × 6 Achsen = 24 KB).  Die
+ *   at-rest Detection schaut auf den **Max-Min-Spread** in diesem
+ *   Buffer — das ist by-design bias-unabhängig, weil Spread nur misst
+ *   wie WEIT die Werte um ihren eigenen Mittelpunkt variieren, nicht
+ *   wo dieser Mittelpunkt liegt.
  *
- * REST_GYRO_STDDEV_DPS / REST_ACCEL_STDDEV_G:
- *   "Still" gilt wenn die laufende StdDev (sqrt der EMA-Varianz) auf
- *   ALLEN sechs Achsen unter dem Schwellwert liegt.  Das ist relativ
- *   zum eigenen Mittelwert — Bias ist also egal.  Schwellen großzügig
- *   gewählt: 3 dps Standardabweichung erlaubt typisches Hand-Auflegen
- *   ohne Mikro-Vibration als "Bewegung" zu zählen.
- *
- * WARMUP_MS:
- *   Direkt nach Boot ist die EMA-Varianz künstlich klein (Init = 0) →
- *   wir würden sofort at-rest signalisieren obwohl wir noch nichts
- *   wissen.  Erste WARMUP_MS davon lassen wir das at-rest-Flag aus.
+ * REST_GYRO_SPREAD_DPS / REST_ACCEL_SPREAD_G:
+ *   "Still" gilt wenn der Max-Min-Spread über die letzten 10 s auf
+ *   ALLEN sechs Achsen unter dem Schwellwert liegt.  Großzügig gewählt
+ *   um Lüfter-Vibration / leichtes Tisch-Wackeln zu tolerieren.
  */
 #define MADGWICK_BETA          0.08f
 #define BIAS_EMA_ALPHA         0.001f
-#define STATS_EMA_ALPHA        1.0e-4f
-#define REST_GYRO_STDDEV_DPS   3.0f
-#define REST_ACCEL_STDDEV_G    0.05f
-#define WARMUP_MS              2000u
+
+#define REST_BUF_SIZE          1000u  /* 10 s @ 100 Hz */
+#define REST_SUBSAMPLE_DECIM   10u    /* 1 kHz / 10  = 100 Hz */
+#define REST_GYRO_SPREAD_DPS   15.0f
+#define REST_ACCEL_SPREAD_G    0.25f
 
 #define DEG_TO_RAD 0.01745329251f
 
@@ -49,24 +43,29 @@ static volatile float s_corr_gx = 0.0f, s_corr_gy = 0.0f, s_corr_gz = 0.0f;
 static volatile float s_bias_temp_c = 0.0f;
 static volatile bool  s_at_rest = false;
 
-/* Laufende Mean/Var über ~10 s je Achse — EMA-Form.
- * Var initialisiert auf etwas Hohes, damit at-rest erst nach Warmup
- * triggern kann (eigentlich nochmal explizit von s_warmup_ms gegated). */
-static float s_mean_gx = 0, s_mean_gy = 0, s_mean_gz = 0;
-static float s_var_gx  = 0, s_var_gy  = 0, s_var_gz  = 0;
-static float s_mean_ax = 0, s_mean_ay = 0, s_mean_az = 0;
-static float s_var_ax  = 0, s_var_ay  = 0, s_var_az  = 0;
-
-static uint32_t s_warmup_ms = 0;
+/* 10s Ring-Buffer für at-rest Detection — je Achse 1000 floats. */
+static float s_buf_gx[REST_BUF_SIZE];
+static float s_buf_gy[REST_BUF_SIZE];
+static float s_buf_gz[REST_BUF_SIZE];
+static float s_buf_ax[REST_BUF_SIZE];
+static float s_buf_ay[REST_BUF_SIZE];
+static float s_buf_az[REST_BUF_SIZE];
+static uint32_t s_buf_head = 0;     /* nächster Schreibindex */
+static uint32_t s_buf_count = 0;    /* Anzahl gültiger Samples (clamped) */
+static uint32_t s_subsample_ctr = 0;
 
 extern uint32_t HAL_GetTick(void);
 
 /* Diagnose */
 volatile uint32_t g_imu_fusion_updates = 0;
-volatile uint32_t g_imu_at_rest_seconds = 0;  /* Sekunden im at-rest seit Boot */
-volatile float    g_imu_stddev_gx_dps = 0;
-volatile float    g_imu_stddev_gy_dps = 0;
-volatile float    g_imu_stddev_gz_dps = 0;
+volatile uint32_t g_imu_at_rest_seconds = 0;
+volatile float    g_imu_spread_gx_dps = 0;
+volatile float    g_imu_spread_gy_dps = 0;
+volatile float    g_imu_spread_gz_dps = 0;
+volatile float    g_imu_spread_ax_g = 0;
+volatile float    g_imu_spread_ay_g = 0;
+volatile float    g_imu_spread_az_g = 0;
+volatile uint32_t g_imu_rest_buf_count = 0;
 
 void imu_fusion_init(float bx, float by, float bz)
 {
@@ -74,11 +73,10 @@ void imu_fusion_init(float bx, float by, float bz)
     s_bias_x = bx; s_bias_y = by; s_bias_z = bz;
     s_corr_gx = s_corr_gy = s_corr_gz = 0.0f;
     s_at_rest = false;
-    s_warmup_ms = 0;
-    s_mean_gx = s_mean_gy = s_mean_gz = 0;
-    s_var_gx  = s_var_gy  = s_var_gz  = 100.0f;   /* hoch → kein at-rest */
-    s_mean_ax = s_mean_ay = s_mean_az = 0;
-    s_var_ax  = s_var_ay  = s_var_az  = 1.0f;
+    s_buf_head = 0;
+    s_buf_count = 0;
+    s_subsample_ctr = 0;
+    g_imu_rest_buf_count = 0;
 }
 
 static inline float fast_invsqrt(float x)
@@ -101,60 +99,73 @@ void imu_fusion_update(float gx_raw, float gy_raw, float gz_raw,
     s_corr_gy = gy;
     s_corr_gz = gz;
 
-    /* 2) At-rest Detection — EMA-Stddev über ~10 s relativ zum
-     *    laufenden Mittelwert je Achse.  Wenn die Streuung auf
-     *    allen 3 Gyro- und 3 Accel-Achsen unter den Schwellen liegt
-     *    → still.  Bias ist hier komplett irrelevant: ein konstanter
-     *    Offset im Gyro-Signal macht den Mittelwert größer, aber die
-     *    Varianz um diesen Mittelwert bleibt klein.
+    /* 2) At-rest Detection per 10 s Ring-Buffer + Max-Min-Spread.
      *
-     *    EMA-Form für Mean+Var:
-     *      mean += α·(x − mean)
-     *      var  = (1 − α)·(var + α·(x − mean)²)
-     *    Wobei (x − mean) NACH dem Mean-Update kleiner ist als vorher;
-     *    die Konvention "vor dem Update" liefert die stabilere Schätzung.
-     */
-    float dgx = gx_raw - s_mean_gx;  s_mean_gx += STATS_EMA_ALPHA * dgx;
-    float dgy = gy_raw - s_mean_gy;  s_mean_gy += STATS_EMA_ALPHA * dgy;
-    float dgz = gz_raw - s_mean_gz;  s_mean_gz += STATS_EMA_ALPHA * dgz;
-    s_var_gx = (1.0f - STATS_EMA_ALPHA) * (s_var_gx + STATS_EMA_ALPHA * dgx * dgx);
-    s_var_gy = (1.0f - STATS_EMA_ALPHA) * (s_var_gy + STATS_EMA_ALPHA * dgy * dgy);
-    s_var_gz = (1.0f - STATS_EMA_ALPHA) * (s_var_gz + STATS_EMA_ALPHA * dgz * dgz);
+     *    Wir samplen mit 1 kHz, behalten aber nur jedes 10. Sample im
+     *    Buffer (= 100 Hz Decimation, 1000 Slots = 10 s).  Wenn der
+     *    Buffer voll ist, scannen wir alle 6 Achsen einmal kurz durch
+     *    und ermitteln Max − Min.  Spread auf ALLEN 6 Achsen unter dem
+     *    Schwellwert → still.  Bias ist by-design irrelevant: Spread
+     *    misst nur, wie WEIT die Werte sich vom eigenen Median wegbewegt
+     *    haben, nicht WO dieser Median liegt.
+     *
+     *    Buffer-Refresh kostet 6×1000 = 6 k Vergleiche × 100 Hz = 600 k/s
+     *    auf M7@216 MHz mit FPU → unter 1 % CPU. */
+    s_subsample_ctr++;
+    if (s_subsample_ctr >= REST_SUBSAMPLE_DECIM) {
+        s_subsample_ctr = 0;
+        s_buf_gx[s_buf_head] = gx_raw;
+        s_buf_gy[s_buf_head] = gy_raw;
+        s_buf_gz[s_buf_head] = gz_raw;
+        s_buf_ax[s_buf_head] = ax;
+        s_buf_ay[s_buf_head] = ay;
+        s_buf_az[s_buf_head] = az;
+        s_buf_head = (s_buf_head + 1u) % REST_BUF_SIZE;
+        if (s_buf_count < REST_BUF_SIZE) {
+            s_buf_count++;
+            g_imu_rest_buf_count = s_buf_count;
+        }
 
-    float dax = ax - s_mean_ax;  s_mean_ax += STATS_EMA_ALPHA * dax;
-    float day = ay - s_mean_ay;  s_mean_ay += STATS_EMA_ALPHA * day;
-    float daz = az - s_mean_az;  s_mean_az += STATS_EMA_ALPHA * daz;
-    s_var_ax = (1.0f - STATS_EMA_ALPHA) * (s_var_ax + STATS_EMA_ALPHA * dax * dax);
-    s_var_ay = (1.0f - STATS_EMA_ALPHA) * (s_var_ay + STATS_EMA_ALPHA * day * day);
-    s_var_az = (1.0f - STATS_EMA_ALPHA) * (s_var_az + STATS_EMA_ALPHA * daz * daz);
-
-    float sgx = sqrtf(s_var_gx);
-    float sgy = sqrtf(s_var_gy);
-    float sgz = sqrtf(s_var_gz);
-    float sax = sqrtf(s_var_ax);
-    float say = sqrtf(s_var_ay);
-    float saz = sqrtf(s_var_az);
-    g_imu_stddev_gx_dps = sgx;
-    g_imu_stddev_gy_dps = sgy;
-    g_imu_stddev_gz_dps = sgz;
-
-    /* Warmup-Zähler — erst nach WARMUP_MS reagieren wir auf at-rest. */
-    if (s_warmup_ms < WARMUP_MS) {
-        s_warmup_ms += (uint32_t)(dt_s * 1000.0f);
+        if (s_buf_count >= REST_BUF_SIZE) {
+            float gx_min = s_buf_gx[0], gx_max = gx_min;
+            float gy_min = s_buf_gy[0], gy_max = gy_min;
+            float gz_min = s_buf_gz[0], gz_max = gz_min;
+            float ax_min = s_buf_ax[0], ax_max = ax_min;
+            float ay_min = s_buf_ay[0], ay_max = ay_min;
+            float az_min = s_buf_az[0], az_max = az_min;
+            for (uint32_t i = 1; i < REST_BUF_SIZE; i++) {
+                float v;
+                v = s_buf_gx[i]; if (v < gx_min) gx_min = v; if (v > gx_max) gx_max = v;
+                v = s_buf_gy[i]; if (v < gy_min) gy_min = v; if (v > gy_max) gy_max = v;
+                v = s_buf_gz[i]; if (v < gz_min) gz_min = v; if (v > gz_max) gz_max = v;
+                v = s_buf_ax[i]; if (v < ax_min) ax_min = v; if (v > ax_max) ax_max = v;
+                v = s_buf_ay[i]; if (v < ay_min) ay_min = v; if (v > ay_max) ay_max = v;
+                v = s_buf_az[i]; if (v < az_min) az_min = v; if (v > az_max) az_max = v;
+            }
+            float sg_x = gx_max - gx_min;
+            float sg_y = gy_max - gy_min;
+            float sg_z = gz_max - gz_min;
+            float sa_x = ax_max - ax_min;
+            float sa_y = ay_max - ay_min;
+            float sa_z = az_max - az_min;
+            g_imu_spread_gx_dps = sg_x;
+            g_imu_spread_gy_dps = sg_y;
+            g_imu_spread_gz_dps = sg_z;
+            g_imu_spread_ax_g   = sa_x;
+            g_imu_spread_ay_g   = sa_y;
+            g_imu_spread_az_g   = sa_z;
+            s_at_rest = (sg_x < REST_GYRO_SPREAD_DPS) &&
+                         (sg_y < REST_GYRO_SPREAD_DPS) &&
+                         (sg_z < REST_GYRO_SPREAD_DPS) &&
+                         (sa_x < REST_ACCEL_SPREAD_G) &&
+                         (sa_y < REST_ACCEL_SPREAD_G) &&
+                         (sa_z < REST_ACCEL_SPREAD_G);
+        }
     }
-
-    bool still = (sgx < REST_GYRO_STDDEV_DPS) &&
-                 (sgy < REST_GYRO_STDDEV_DPS) &&
-                 (sgz < REST_GYRO_STDDEV_DPS) &&
-                 (sax < REST_ACCEL_STDDEV_G)  &&
-                 (say < REST_ACCEL_STDDEV_G)  &&
-                 (saz < REST_ACCEL_STDDEV_G)  &&
-                 (s_warmup_ms >= WARMUP_MS);
-    s_at_rest = still;
 
     /* 3) Bias-EMA nur wenn at-rest.  Wir lernen den Bias gegen die
      *    Raw-Gyro-Werte — bei at-rest sollte das der wahre Bias sein. */
-    if (still) {
+    if (s_at_rest) {
         s_bias_x += BIAS_EMA_ALPHA * (gx_raw - s_bias_x);
         s_bias_y += BIAS_EMA_ALPHA * (gy_raw - s_bias_y);
         s_bias_z += BIAS_EMA_ALPHA * (gz_raw - s_bias_z);

@@ -59,7 +59,7 @@
 /* CMD_SET_PAA_CAL payload: cx (f32) + cy (f32) + height (f32) = 12 B */
 #define FRAME_PAYLOAD_CMD_SET_PAA_CAL 12u
 
-/* ORIENTATION payload (37 B):
+/* ORIENTATION payload (41 B):
  *   +0   float    qw
  *   +4   float    qx
  *   +8   float    qy
@@ -69,11 +69,10 @@
  *   +24  float    gyro_z_corrected_dps
  *   +28  float    bias_x_dps
  *   +32  float    bias_y_dps
- *   +36  uint8    flags  (bit0 = at_rest, bit1 = bias_persisted)
- *   ─ bias_z + bias_temp gehen in den 1 Hz PAA_CAL-Pendant ICM_CAL —
- *     hier reichen die Achsen XY für Live-Plotting.  Wir machen das
- *     bewusst klein damit 100 Hz × 37 B = 3.7 KB/s vertretbar bleibt. */
-#define FRAME_PAYLOAD_ORIENTATION 37u
+ *   +36  float    bias_z_dps
+ *   +40  uint8    flags  (bit0 = at_rest, bit1 = bias_persisted)
+ *   100 Hz × 41 B = 4.1 KB/s — auf USB-FS gut vertretbar. */
+#define FRAME_PAYLOAD_ORIENTATION 41u
 
 /* Commands ohne Payload (Trigger). */
 #define FRAME_PAYLOAD_CMD_NONE 0u

@@ -113,10 +113,11 @@ static void send_orientation_telemetry(void)
     memcpy(p + 24, &gz, 4);
     memcpy(p + 28, &bx, 4);
     memcpy(p + 32, &by, 4);
+    memcpy(p + 36, &bz, 4);
     uint8_t flags = 0;
     if (imu_fusion_is_at_rest()) flags |= 0x01;
     if (s_cal.valid)              flags |= 0x02;
-    p[36] = flags;
+    p[40] = flags;
     (void)frame_send(FRAME_TYPE_ORIENTATION, p, FRAME_PAYLOAD_ORIENTATION);
 }
 

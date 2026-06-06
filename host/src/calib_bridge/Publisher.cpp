@@ -165,7 +165,7 @@ namespace calib_bridge
 
         raccoon::vector3f_t b{};
         b.timestamp = ts;
-        b.x = s.bias_x_dps; b.y = s.bias_y_dps; b.z = 0.0f;  // z geht in Status
+        b.x = s.bias_x_dps; b.y = s.bias_y_dps; b.z = s.bias_z_dps;
         impl_->transport.publish(Channels::ICM_GYRO_BIAS, b);
 
         raccoon::scalar_i32_t r{};
