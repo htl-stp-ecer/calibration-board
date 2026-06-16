@@ -22,6 +22,7 @@ namespace calib_bridge
                  | (uint32_t(p[2]) << 16)
                  | (uint32_t(p[3]) << 24);
         }
+        int32_t  rd_i32(const uint8_t* p) { return static_cast<int32_t>(rd_u32(p)); }
     }
 
     void FrameDecoder::reset()
@@ -80,6 +81,7 @@ namespace calib_bridge
         {
             case FrameType::ICM:         expected = framing::PAYLOAD_LEN_ICM;         break;
             case FrameType::PAA:         expected = framing::PAYLOAD_LEN_PAA;         break;
+            case FrameType::PaaAcc:      expected = framing::PAYLOAD_LEN_PAA_ACC;     break;
             case FrameType::Status:      expected = framing::PAYLOAD_LEN_STATUS;      break;
             case FrameType::PaaCal:      expected = framing::PAYLOAD_LEN_PAA_CAL;     break;
             case FrameType::Orientation: expected = framing::PAYLOAD_LEN_ORIENTATION; break;
@@ -138,6 +140,15 @@ namespace calib_bridge
                 if (paa_cb_) paa_cb_(s);
                 break;
             }
+            case FrameType::PaaAcc:
+            {
+                framing::PaaAccFrame s{};
+                s.t_ms  = t_ms;
+                s.acc_x = rd_i32(p + 0);
+                s.acc_y = rd_i32(p + 4);
+                if (paa_acc_cb_) paa_acc_cb_(s);
+                break;
+            }
             case FrameType::Orientation:
             {
                 framing::OrientationFrame s{};
@@ -165,10 +176,12 @@ namespace calib_bridge
                 // Floats werden Wort-für-Wort übertragen — wir können
                 // sie nicht direkt aus uint32_t rd_u32 lesen ohne Float-
                 // Aliasing, also memcpy.
-                std::memcpy(&s.cx_per_cm, p + 0, 4);
-                std::memcpy(&s.cy_per_cm, p + 4, 4);
-                std::memcpy(&s.height_mm, p + 8, 4);
-                s.valid = p[12] != 0;
+                std::memcpy(&s.cx_per_cm, p +  0, 4);
+                std::memcpy(&s.cy_per_cm, p +  4, 4);
+                std::memcpy(&s.height_mm, p +  8, 4);
+                std::memcpy(&s.off_x_mm,  p + 12, 4);
+                std::memcpy(&s.off_y_mm,  p + 16, 4);
+                s.valid = p[20] != 0;
                 if (paa_cal_cb_) paa_cal_cb_(s);
                 break;
             }
@@ -208,6 +221,24 @@ namespace calib_bridge
         std::memcpy(out + 15, &h,  4);
         out[7 + framing::PAYLOAD_LEN_CMD_SET_PAA_CAL] =
             crc8_smbus(out + 1, 2 + 4 + framing::PAYLOAD_LEN_CMD_SET_PAA_CAL);
+        return total;
+    }
+
+    std::size_t FrameDecoder::encode_set_paa_offset(uint8_t* out, std::size_t out_cap,
+                                                    float off_x_mm, float off_y_mm)
+    {
+        const std::size_t total = framing::OVERHEAD + framing::PAYLOAD_LEN_CMD_SET_PAA_OFFSET;
+        if (out_cap < total) return 0;
+
+        out[0] = SYNC;
+        out[1] = static_cast<uint8_t>(FrameType::CmdSetPaaOffset);
+        out[2] = framing::PAYLOAD_LEN_CMD_SET_PAA_OFFSET;
+        // T_MS: 0 — FW ignoriert es bei Commands.
+        out[3] = out[4] = out[5] = out[6] = 0;
+        std::memcpy(out + 7,  &off_x_mm, 4);
+        std::memcpy(out + 11, &off_y_mm, 4);
+        out[7 + framing::PAYLOAD_LEN_CMD_SET_PAA_OFFSET] =
+            crc8_smbus(out + 1, 2 + 4 + framing::PAYLOAD_LEN_CMD_SET_PAA_OFFSET);
         return total;
     }
 

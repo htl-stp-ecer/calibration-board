@@ -74,6 +74,19 @@ namespace calib_bridge
         pub_i32(Channels::PAA_MOTION,  s.motion);
     }
 
+    void Publisher::publish_paa_acc(const framing::PaaAccFrame& s)
+    {
+        const int64_t ts = now_us();
+        auto pub_i32 = [&](const char* ch, int32_t v) {
+            raccoon::scalar_i32_t m{};
+            m.timestamp = ts;
+            m.value = v;
+            impl_->transport.publish(ch, m);
+        };
+        pub_i32(Channels::PAA_ACC_X, s.acc_x);
+        pub_i32(Channels::PAA_ACC_Y, s.acc_y);
+    }
+
     namespace
     {
         void publish_string(raccoon::Transport& t, const char* channel, const std::string& v)
@@ -118,6 +131,8 @@ namespace calib_bridge
         pub_f(Channels::PAA_CAL_CX,     s.cx_per_cm);
         pub_f(Channels::PAA_CAL_CY,     s.cy_per_cm);
         pub_f(Channels::PAA_CAL_HEIGHT, s.height_mm);
+        pub_f(Channels::PAA_CAL_OFF_X,  s.off_x_mm);
+        pub_f(Channels::PAA_CAL_OFF_Y,  s.off_y_mm);
 
         raccoon::scalar_i32_t v{};
         v.timestamp = ts;

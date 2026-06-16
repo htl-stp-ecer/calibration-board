@@ -42,6 +42,12 @@
  * Odometrie und Display. */
 #define FRAME_TYPE_ORIENTATION 0x05u
 
+/* PAA_ACC — Firmware → Host: frei laufender, vorzeichenbehafteter
+ * Zähler der dx/dy-Counts (int32).  Die Platine integriert selbst; der
+ * Host akkumuliert NICHT mehr.  Der Kalibrier-Wizard liest Start-/End-
+ * Stand und nimmt die Differenz → netto-Verschiebung in Counts. */
+#define FRAME_TYPE_PAA_ACC     0x06u
+
 /* Host → Firmware Command-Frames.  Selbes Wire-Format (SYNC/TYPE/LEN/
  * T_MS/CRC), T_MS wird vom Host gesetzt und ignoriert. */
 #define FRAME_TYPE_CMD_SET_PAA_CAL  0x10u
@@ -49,15 +55,22 @@
 #define FRAME_TYPE_CMD_SAVE_GYRO_BIAS 0x11u
 /* Bias auf 0 zurücksetzen (nicht im Flash). */
 #define FRAME_TYPE_CMD_RESET_GYRO_BIAS 0x12u
+/* PAA-Montageoffset vom Drehzentrum (mm) setzen + in Flash schreiben. */
+#define FRAME_TYPE_CMD_SET_PAA_OFFSET 0x13u
 
 #define FRAME_PAYLOAD_ICM     14u
 #define FRAME_PAYLOAD_PAA     10u
+/* PAA_ACC payload: acc_x (int32 LE) + acc_y (int32 LE) = 8 Byte */
+#define FRAME_PAYLOAD_PAA_ACC 8u
 #define FRAME_PAYLOAD_STATUS  20u
 /* PAA_CAL payload: cx_per_cm (f32 LE) + cy_per_cm (f32 LE) +
- *                  height_mm (f32 LE) + valid (u8) = 13 Byte */
-#define FRAME_PAYLOAD_PAA_CAL 13u
+ *                  height_mm (f32 LE) + off_x_mm (f32 LE) +
+ *                  off_y_mm (f32 LE) + valid (u8) = 21 Byte */
+#define FRAME_PAYLOAD_PAA_CAL 21u
 /* CMD_SET_PAA_CAL payload: cx (f32) + cy (f32) + height (f32) = 12 B */
 #define FRAME_PAYLOAD_CMD_SET_PAA_CAL 12u
+/* CMD_SET_PAA_OFFSET payload: off_x_mm (f32) + off_y_mm (f32) = 8 B */
+#define FRAME_PAYLOAD_CMD_SET_PAA_OFFSET 8u
 
 /* ORIENTATION payload (41 B):
  *   +0   float    qw

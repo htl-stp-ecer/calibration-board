@@ -32,6 +32,14 @@ static const module_t *const MODULES[] = {
 };
 #define NUM_MODULES (sizeof(MODULES) / sizeof(MODULES[0]))
 
+/* Soft-Start: Module gestaffelt hochfahren statt alle gleichzeitig.  Jeder
+ * Sensor/Peripherie-Block zieht beim Bring-up Strom; gleichzeitig = ein
+ * Step, der eine grenzwertige Versorgung in den Brownout zieht.  Die kurze
+ * Pause lässt den Strom jedes Blocks setteln, bevor der nächste dazukommt
+ * → flacherer Anstieg.  (Der Kondensator-Inrush beim Einstecken liegt VOR
+ * dieser Phase und ist reine Hardware — das glättet sie NICHT.) */
+#define SETUP_STAGGER_MS  25u
+
 static void run_setup(void)
 {
     for (size_t i = 0; i < NUM_MODULES; i++) {
@@ -41,6 +49,7 @@ static void run_setup(void)
             continue;
         }
         if (m->setup) m->setup();
+        HAL_Delay(SETUP_STAGGER_MS);
     }
 }
 
@@ -66,5 +75,11 @@ void app_main(void)
 
     while (1) {
         run_loop_iteration();
+        /* Kein __WFI: PAA wird jede Iteration gelesen (~1 kHz, Wunsch:
+         * maximale Rate) → der Loop hat ohnehin kaum Leerlauf, WFI würde
+         * also kaum Strom sparen, machte aber SWD-HOTPLUG-Debugging
+         * unzuverlässig (schlafender Core).  Power-Saving kam über den
+         * 192->96-MHz-Takt — der scheiterte aber an der PAA-SPI; daher
+         * vorerst bei 192 MHz. */
     }
 }

@@ -71,7 +71,12 @@ static int8_t CDC_Receive_FS(uint8_t *Buf, uint32_t *Len)
 static int8_t CDC_TransmitCplt_FS(uint8_t *Buf, uint32_t *Len, uint8_t epnum)
 {
     (void)Buf; (void)Len; (void)epnum;
+    /* Chain-TX: sofort den nächsten Packet nachschieben statt auf den
+     * nächsten Main-Loop-Pump zu warten.  Damit läuft die USB-TX mit der
+     * Host-Drain-Rate (back-to-back Packets) statt 1 Packet/Loop-Iteration
+     * — das war der eigentliche Durchsatz-Deckel (~117 Packets/s). */
     s_tx_busy = 0;
+    usb_cdc_tx_pump();
     return USBD_OK;
 }
 
@@ -147,13 +152,22 @@ int usb_cdc_printf(const char *fmt, ...)
     return (int)usb_cdc_write((const uint8_t *)buf, (uint32_t)n);
 }
 
+/* Schiebt einen Bulk-Packet raus, wenn kein Transfer läuft und Daten da
+ * sind.  Wird aus drei Kontexten gerufen: Main-Loop (usb_module.loop),
+ * den write()-Pfaden UND (chain-TX) dem TransmitCplt-USB-ISR.  Damit die
+ * sich nicht gegenseitig den s_tx_busy/s_tx_tail-Stand zerschießen, läuft
+ * der Check+Arm in einer kurzen Critical Section (~wenige µs für 64 B). */
 void usb_cdc_tx_pump(void)
 {
     if (!usb_cdc_is_ready()) return;
-    if (s_tx_busy) return;
+
+    const uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    if (s_tx_busy) { __set_PRIMASK(primask); return; }
 
     uint32_t avail = ring_used();
-    if (avail == 0) return;
+    if (avail == 0) { __set_PRIMASK(primask); return; }
 
     /* Drain up to one FS bulk packet (64 B).  Wrap-aware copy. */
     uint32_t chunk = avail > CDC_DATA_FS_MAX_PACKET_SIZE
@@ -168,4 +182,6 @@ void usb_cdc_tx_pump(void)
     } else {
         s_tx_busy = 0;  /* try again next pump */
     }
+
+    __set_PRIMASK(primask);
 }

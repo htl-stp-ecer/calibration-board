@@ -46,6 +46,14 @@ typedef struct {
     float    paa_cx_per_cm;
     float    paa_cy_per_cm;
     float    paa_height_mm;
+    /* PAA-Sensor-Montageoffset vom Roboter-Drehzentrum (mm, Body-Frame:
+     * +x = PAA-dx-Achse, +y = PAA-dy-Achse).  Wird vom Host genutzt um
+     * den Rotations-Scheinfluss (ω×r) aus der Odometrie zu rechnen.  0 =
+     * Sensor im Drehzentrum (= altes Verhalten).  Liegt im ehemaligen
+     * reserved-Bereich des Blobs → alte Flash-Stände lesen 0, kein
+     * Magic-Bump nötig. */
+    float    paa_off_x_mm;
+    float    paa_off_y_mm;
     /* ICM gyro bias (dps) — bei at-rest gemessen.  Vom Fusion-Modul
      * automatisch nachgeführt (EMA), vom FW subtrahiert bevor jeder
      * ICM-Sample in den Madgwick-Filter und in das Telemetry-Frame

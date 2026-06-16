@@ -37,6 +37,7 @@ namespace calib_bridge
     {
         decoder_.on_icm([this](const framing::IcmSample& s)    { on_icm(s); });
         decoder_.on_paa([this](const framing::PaaSample& s)    { on_paa(s); });
+        decoder_.on_paa_acc([this](const framing::PaaAccFrame& s){ on_paa_acc(s); });
         decoder_.on_status([this](const framing::StatusFrame& s){ on_status(s); });
         decoder_.on_paa_cal([this](const framing::PaaCalFrame& s){ on_paa_cal(s); });
         decoder_.on_orientation([this](const framing::OrientationFrame& s){ on_orientation(s); });
@@ -118,6 +119,29 @@ namespace calib_bridge
             publisher_.publish_board_status("disconnected", "(none)");
         }
 
+        // ── TEMP read-path profiling ──────────────────────────────────────
+        // Antwortet: drained die Bridge den USB schnell genug, oder arbeitet
+        // sie Backlogs ab?  full4096 >> 0 ODER hohe avg-read-size = Backlog
+        // (alte Daten).  reads/s = effektive Loop-Rate.
+        {
+            static uint64_t s_reads = 0, s_bytes = 0, s_full = 0;
+            static int      s_maxn  = 0;
+            static auto     s_t0    = Clock::now();
+            ++s_reads;
+            if (n > 0) {
+                s_bytes += static_cast<uint64_t>(n);
+                if (static_cast<std::size_t>(n) == chunk.size()) ++s_full;
+                if (n > s_maxn) s_maxn = n;
+            }
+            const auto pnow = Clock::now();
+            if (pnow - s_t0 >= std::chrono::seconds(1)) {
+                spdlog::info("READSTAT reads/s={} bytes/s={} full4096/s={} max_read={}B avg_read={}B",
+                             s_reads, s_bytes, s_full, s_maxn,
+                             s_reads ? (s_bytes / s_reads) : 0);
+                s_reads = s_bytes = s_full = 0; s_maxn = 0; s_t0 = pnow;
+            }
+        }
+
         // Watchdog: wenn länger nichts kommt, ist das Board hängen
         // geblieben → close + reopen.  CDC stürzt manchmal still ab.
         if (port_.is_open() && last_byte_at_ != Clock::time_point{} &&
@@ -194,33 +218,64 @@ namespace calib_bridge
             ? (static_cast<float>(s.dx) / paa_cx_per_cm_) : 0.0f;
         const float dy_cm = (paa_cy_per_cm_ > 0.0f)
             ? (static_cast<float>(s.dy) / paa_cy_per_cm_) : 0.0f;
+        // Roh-Position (unkorrigiert) — der Kalibrier-Wizard liest die,
+        // also bewusst OHNE ω×r-Korrektur lassen.
         paa_pos_x_cm_ += dx_cm;
         paa_pos_y_cm_ += dy_cm;
         publisher_.publish_paa_cm(dx_cm, dy_cm, paa_pos_x_cm_, paa_pos_y_cm_);
 
-        // Odometrie-Fusion: PAA gibt body-frame [dx, dy, 0] (Ground-Plane
-        // Bewegung unter dem Sensor).  Wir rotieren mit der aktuellen
-        // Quaternion in den World-Frame.  Das nutzt die ersten zwei
-        // Zeilen der Rotationsmatrix R(q):
+        // Heading = yaw aus dem Quaternion.
+        const float yaw_rad = std::atan2(2.0f * (qw_*qz_ + qx_*qy_),
+                                          1.0f - 2.0f * (qy_*qy_ + qz_*qz_));
+
+        // ── ω×r-Korrektur ───────────────────────────────────────────────
+        // Der PAA sitzt NICHT im Drehzentrum, sondern bei Offset
+        // r = (off_x, off_y) im Body-Frame.  Er misst die Geschwindigkeit
+        // seines eigenen Punkts: v_sensor = v_center + ω×r.  Wir wollen die
+        // Bewegung des Drehzentrums → v_center = v_sensor − ω×r.
+        // Mit ω = (0,0,Δθ) (Heading-Änderung seit letztem PAA-Sample) gilt
+        // ω×r = (−Δθ·off_y, Δθ·off_x).  Korrigierter Body-Frame-Flow:
+        //   dx_corr = dx_cm − (−Δθ·off_y) = dx_cm + Δθ·off_y
+        //   dy_corr = dy_cm − ( Δθ·off_x) = dy_cm − Δθ·off_x
+        // Bei Offset = 0 ist das identisch zum alten Verhalten.
+        float dth = have_prev_yaw_ ? (yaw_rad - prev_yaw_rad_) : 0.0f;
+        // Heading-Differenz auf [−π, π] wrappen (Sprung bei ±180°).
+        constexpr float PI_F  = 3.14159265358979f;
+        constexpr float TAU_F = 2.0f * PI_F;
+        while (dth >  PI_F) dth -= TAU_F;
+        while (dth < -PI_F) dth += TAU_F;
+        prev_yaw_rad_  = yaw_rad;
+        have_prev_yaw_ = true;
+
+        const float dx_corr = dx_cm + dth * paa_off_y_cm_;
+        const float dy_corr = dy_cm - dth * paa_off_x_cm_;
+
+        // Odometrie-Fusion: korrigierten body-frame [dx, dy, 0] mit der
+        // aktuellen Quaternion in den World-Frame rotieren.  Das nutzt die
+        // ersten zwei Zeilen der Rotationsmatrix R(q):
         //   R00 = 1 - 2(qy² + qz²)
         //   R01 = 2(qx*qy - qw*qz)
         //   R10 = 2(qx*qy + qw*qz)
         //   R11 = 1 - 2(qx² + qz²)
-        // [vx, vy] = R · [dx_cm, dy_cm, 0]^T projiziert auf XY-Plane.
+        // [vx, vy] = R · [dx_corr, dy_corr, 0]^T projiziert auf XY-Plane.
         const float r00 = 1.0f - 2.0f * (qy_*qy_ + qz_*qz_);
         const float r01 = 2.0f * (qx_*qy_ - qw_*qz_);
         const float r10 = 2.0f * (qx_*qy_ + qw_*qz_);
         const float r11 = 1.0f - 2.0f * (qx_*qx_ + qz_*qz_);
-        const float vx = r00 * dx_cm + r01 * dy_cm;
-        const float vy = r10 * dx_cm + r11 * dy_cm;
+        const float vx = r00 * dx_corr + r01 * dy_corr;
+        const float vy = r10 * dx_corr + r11 * dy_corr;
         odom_pos_x_cm_ += vx;
         odom_pos_y_cm_ += vy;
 
-        // Heading = yaw aus dem Quaternion.
-        const float yaw_rad = std::atan2(2.0f * (qw_*qz_ + qx_*qy_),
-                                          1.0f - 2.0f * (qy_*qy_ + qz_*qz_));
         const float yaw_deg = yaw_rad * 57.29577951f;
         publisher_.publish_odom(odom_pos_x_cm_, odom_pos_y_cm_, yaw_deg);
+    }
+
+    void Application::on_paa_acc(const framing::PaaAccFrame& s)
+    {
+        // Reine Durchreiche — die Platine integriert, der Host akkumuliert
+        // bewusst NICHT.  Der Kalibrier-Wizard nimmt Differenzen.
+        publisher_.publish_paa_acc(s);
     }
 
     void Application::on_orientation(const framing::OrientationFrame& s)
@@ -243,6 +298,12 @@ namespace calib_bridge
 
         constexpr float RAD2DEG = 57.29577951f;
         publisher_.publish_orientation(s, roll * RAD2DEG, pitch * RAD2DEG, yaw * RAD2DEG);
+
+        // Heading lebt am Quaternion (100 Hz), NICHT am PAA — sonst steht
+        // die Odometrie-Anzeige komplett still sobald der optische Sensor
+        // absent ist.  Position kann sich ohne PAA naturgemäß nicht ändern
+        // (keine Translationsquelle), das Heading dreht hier aber mit.
+        publisher_.publish_odom(odom_pos_x_cm_, odom_pos_y_cm_, yaw * RAD2DEG);
     }
 
     void Application::on_paa_cal(const framing::PaaCalFrame& s)
@@ -251,17 +312,23 @@ namespace calib_bridge
             s.cx_per_cm != paa_cx_per_cm_ ||
             s.cy_per_cm != paa_cy_per_cm_ ||
             s.height_mm != paa_height_mm_ ||
+            s.off_x_mm  != paa_off_x_cm_ * 10.0f ||
+            s.off_y_mm  != paa_off_y_cm_ * 10.0f ||
             s.valid     != paa_cal_valid_;
 
         paa_cx_per_cm_ = s.cx_per_cm;
         paa_cy_per_cm_ = s.cy_per_cm;
         paa_height_mm_ = s.height_mm;
+        // Offset kommt in mm — Odometrie rechnet in cm.
+        paa_off_x_cm_  = s.off_x_mm * 0.1f;
+        paa_off_y_cm_  = s.off_y_mm * 0.1f;
         paa_cal_valid_ = s.valid;
         publisher_.publish_paa_cal(s);
 
         if (changed) {
-            spdlog::info("PAA cal updated: cx={:.3f} cy={:.3f} h={:.2f} valid={}",
-                         s.cx_per_cm, s.cy_per_cm, s.height_mm, s.valid);
+            spdlog::info("PAA cal updated: cx={:.3f} cy={:.3f} h={:.2f} off=({:.1f},{:.1f})mm valid={}",
+                         s.cx_per_cm, s.cy_per_cm, s.height_mm,
+                         s.off_x_mm, s.off_y_mm, s.valid);
         }
     }
 
@@ -294,6 +361,31 @@ namespace calib_bridge
                 send_set_paa_cal(cx, cy, h);
             });
 
+        // SET_PAA_OFFSET — string_t JSON {"off_x_mm":X,"off_y_mm":Y}.
+        publisher_.transport().subscribe<raccoon::string_t>(
+            Channels::CMD_PAA_SET_OFFSET,
+            [this](const raccoon::string_t& m) {
+                const std::string& j = m.value;
+                auto pick = [&](const char* key, float& dst) -> bool {
+                    auto pos = j.find(key);
+                    if (pos == std::string::npos) return false;
+                    pos = j.find(':', pos);
+                    if (pos == std::string::npos) return false;
+                    try {
+                        dst = std::stof(j.substr(pos + 1));
+                        return true;
+                    } catch (...) { return false; }
+                };
+                float ox = paa_off_x_cm_ * 10.0f, oy = paa_off_y_cm_ * 10.0f;
+                bool ok = pick("off_x_mm", ox) | pick("off_y_mm", oy);
+                if (!ok) {
+                    spdlog::warn("CMD_PAA_SET_OFFSET: kein bekannter Key in '{}'", j);
+                    return;
+                }
+                spdlog::info("CMD_PAA_SET_OFFSET parsed: off=({:.1f},{:.1f}) mm", ox, oy);
+                send_set_paa_offset(ox, oy);
+            });
+
         // RESET_POSITION — Bridge-interne Integration zurücksetzen.
         publisher_.transport().subscribe<raccoon::scalar_i32_t>(
             Channels::CMD_PAA_RESET_POS,
@@ -323,6 +415,9 @@ namespace calib_bridge
                 spdlog::info("CMD_ODOM_RESET: Odometrie-Pose genullt");
                 odom_pos_x_cm_ = 0.0f;
                 odom_pos_y_cm_ = 0.0f;
+                // Heading-Tracking neu starten — sonst gibt's beim nächsten
+                // PAA-Sample einen Δθ-Sprung über das Reset hinweg.
+                have_prev_yaw_ = false;
             });
     }
 
@@ -356,6 +451,14 @@ namespace calib_bridge
         std::array<uint8_t, 32> buf{};
         const auto n = FrameDecoder::encode_set_paa_cal(buf.data(), buf.size(), cx, cy, h);
         queue_or_send(port_, pending_tx_, buf.data(), n, "CMD_SET_PAA_CAL");
+    }
+
+    void Application::send_set_paa_offset(float off_x_mm, float off_y_mm)
+    {
+        std::array<uint8_t, 32> buf{};
+        const auto n = FrameDecoder::encode_set_paa_offset(buf.data(), buf.size(),
+                                                           off_x_mm, off_y_mm);
+        queue_or_send(port_, pending_tx_, buf.data(), n, "CMD_SET_PAA_OFFSET");
     }
 
     void Application::send_save_gyro_bias()

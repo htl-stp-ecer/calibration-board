@@ -87,17 +87,32 @@ static int reinit_spi2(void)
      * (default mode 0).  Probieren wir Mode 0 als Diagnose. */
     hspi2.Init.CLKPolarity       = SPI_POLARITY_LOW;
     hspi2.Init.CLKPhase          = SPI_PHASE_1EDGE;
-    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128; /* 48 MHz / 128 = 375 kHz */
+    /* APB1 = HCLK/4 = 24 MHz @ 96 MHz SYSCLK.  /16 = 1.5 MHz — knapp unter
+     * dem 2-MHz-Max des PAA5100.  Motion-Burst (13 Byte) ~70 µs.  (Bei
+     * Init-Problemen → /32 = 750 kHz, lief verifiziert stabil.) */
+    hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
     hspi2.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
     return (HAL_SPI_Init(&hspi2) == HAL_OK) ? 0 : -1;
 }
 
-/* SysClk = 192 MHz, NOP ≈ 5.2 ns.  Loops sind volatile → ~3 Zyklen pro
- * Iteration → ca. 64 NOPs ergeben 1 µs. */
+/* Exakte µs-Verzögerung über den DWT-Cycle-Counter — taktunabhängig, weil
+ * sie SystemCoreClock zur Laufzeit nutzt (passt sich also automatisch an
+ * 96 MHz, 192 MHz, … an).  Ersetzt die fragile NOP-Schleifen-Kalibrierung,
+ * die bei 96 MHz zu kurze PAA-Timings lieferte → init schlug fehl.  DWT
+ * wird beim ersten Aufruf einmalig scharfgeschaltet (Cortex-M7: CYCCNT
+ * läuft auch ohne angeschlossenen Debugger, sobald TRCENA gesetzt ist). */
 static inline void delay_us(uint32_t us)
 {
-    uint32_t loops = us * 64u;
-    for (volatile uint32_t i = 0; i < loops; i++) __NOP();
+    static uint8_t s_dwt_ready = 0u;
+    if (!s_dwt_ready) {
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+        DWT->CYCCNT = 0u;
+        DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
+        s_dwt_ready = 1u;
+    }
+    const uint32_t start = DWT->CYCCNT;
+    const uint32_t ticks = us * (SystemCoreClock / 1000000u);
+    while ((DWT->CYCCNT - start) < ticks) { __NOP(); }
 }
 
 /* CS-Aware single-byte write/read.  PixArt-Pattern: bit 7 = R/W.
@@ -135,20 +150,24 @@ static uint8_t paa_read(uint8_t reg)
     return rx;
 }
 
+/* Motion-Burst — Hot Path, daher auf Datenblatt-Timing getrimmt:
+ * tSRAD (address→data) = 35 µs typ. → 50 µs mit Marge (war 500 µs),
+ * Inter-Frame tSRR ≈ 20 µs → 50 µs (war 200 µs).  Mit DWT-genauem delay_us
+ * ist das sicher.  Read fällt damit von ~1.36 ms auf ~0.34 ms. */
 static void paa_burst_read(uint8_t reg, uint8_t *buf, unsigned len)
 {
     uint8_t addr = reg & 0x7Fu;
     cs_low();
     delay_us(50);
     HAL_SPI_Transmit(&hspi2, &addr, 1, 50);
-    delay_us(500);
+    delay_us(50);   /* tSRAD (Datenblatt 35 µs) */
     uint8_t tx_zero[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                           0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     if (len > sizeof(tx_zero)) len = sizeof(tx_zero);
     HAL_SPI_TransmitReceive(&hspi2, tx_zero, buf, (uint16_t)len, 100);
     delay_us(50);
     cs_high();
-    delay_us(200);
+    delay_us(50);   /* Inter-Frame tSRR (Datenblatt ~20 µs) */
 }
 
 /* ---------- "Secret sauce" — PAA5100 calibration sequence --------------- */

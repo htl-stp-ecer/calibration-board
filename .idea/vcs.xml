@@ -4,6 +4,7 @@
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/Firmware/lib/sh2" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/host/build-aarch64/_deps/spdlog-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/host/build/_deps/spdlog-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/host/third_party/raccoon-transport" vcs="Git" />
   </component>
 </project>

@@ -24,9 +24,26 @@
 #define PAA_RETRY_INTERVAL_MS  2000U
 #define PAA_IO_FAIL_THRESHOLD  3U
 
+/* Event-getrieben: nicht mit voller Loop-Rate (~1 kHz) Nullen pollen.
+ * Alle PAA_POLL_PERIOD_MS einmal lesen (dx/dy akkumulieren on-chip, also
+ * geht nichts verloren) und ein Frame NUR senden wenn echte Bewegung
+ * anliegt — dann „kriegt der Host immer was Neues wenn der PAA was Neues
+ * hat".  Ein langsamer Heartbeat hält trotzdem die Liveness/Squal-Anzeige
+ * am Laufen, auch wenn der Roboter steht. */
+#define PAA_POLL_PERIOD_MS   2u    /* 500 Hz Poll — responsive, 60% weniger Reads als 1254 Hz */
+#define PAA_HEARTBEAT_MS     200u  /* 5 Hz: ein Frame auch ohne Bewegung (Liveness + Squal) */
+
 static paa5100_status_t s_init_status = PAA5100_ERR_IO;
 static uint32_t         s_next_retry_tick;
+static uint32_t         s_next_sample_tick;
+static uint32_t         s_next_heartbeat;
 static uint32_t         s_consec_io_fail;
+
+/* Frei laufender signed Counts-Akkumulator (Board-Integration).  Der
+ * Host akkumuliert nicht mehr; der Kalibrier-Wizard nimmt Differenzen.
+ * Bei jedem (Re-)Init auf 0 gesetzt, damit ein Reconnect sauber startet. */
+static int32_t s_acc_x;
+static int32_t s_acc_y;
 
 volatile int      g_paa_init_status      = 0xDEADBEEF;
 volatile uint32_t g_paa_dropped_frames   = 0;
@@ -41,6 +58,8 @@ static void try_init(void)
     g_paa_init_status = (int)s_init_status;
     if (s_init_status == PAA5100_OK) {
         s_consec_io_fail = 0;
+        s_acc_x = 0;
+        s_acc_y = 0;
         if (g_paa_init_attempts > 1) {
             g_paa_reconnect_count++;
             printf("[paa] reconnected (attempt %lu, id=0x%02x rev=0x%02x)\r\n",
@@ -77,6 +96,12 @@ static void paa_loop(void)
         return;
     }
 
+    /* Poll-Rate-Limit: alle PAA_POLL_PERIOD_MS einmal lesen statt jede
+     * Loop-Iteration.  Spart die ~0.27 ms Burst-Read-Zeit der Iterationen
+     * dazwischen — kein Verlust, weil der PAA dx/dy on-chip akkumuliert. */
+    if ((int32_t)(HAL_GetTick() - s_next_sample_tick) < 0) return;
+    s_next_sample_tick = HAL_GetTick() + PAA_POLL_PERIOD_MS;
+
     paa5100_motion_t m;
     if (paa5100_read_motion(&m) != PAA5100_OK) {
         if (++s_consec_io_fail >= PAA_IO_FAIL_THRESHOLD) {
@@ -93,6 +118,20 @@ static void paa_loop(void)
     }
     s_consec_io_fail = 0;
 
+    /* Counts IMMER akkumulieren (on-chip-Delta nicht verlieren); bei
+     * Stillstand ist dx=dy=0, also No-op. */
+    s_acc_x += m.dx;
+    s_acc_y += m.dy;
+
+    /* Event-getrieben senden: nur bei echter Bewegung — sonst nur ein
+     * langsamer Heartbeat (Liveness + Squal).  So kriegt der Host genau
+     * dann ein neues PAA-Frame, wenn der Sensor was Neues hat; bei
+     * Stillstand kein Nullen-Spam. */
+    const bool paa_moved     = (m.dx != 0) || (m.dy != 0);
+    const bool paa_heartbeat = (int32_t)(HAL_GetTick() - s_next_heartbeat) >= 0;
+    if (!paa_moved && !paa_heartbeat) return;
+    if (paa_heartbeat) s_next_heartbeat = HAL_GetTick() + PAA_HEARTBEAT_MS;
+
     /* Payload Layout: dx,dy (int16 LE), squal, shutter_hi, shutter_lo, motion */
     uint8_t payload[FRAME_PAYLOAD_PAA];
     memcpy(&payload[0], &m.dx, 2);
@@ -105,6 +144,15 @@ static void paa_loop(void)
     payload[9] = 0;
 
     if (!frame_send(FRAME_TYPE_PAA, payload, FRAME_PAYLOAD_PAA)) {
+        g_paa_dropped_frames++;
+    }
+
+    /* Aktuellen Akkumulator-Stand mitsenden (Wizard liest nur die
+     * Start-/End-Differenz).  Akkumuliert wurde oben bereits. */
+    uint8_t acc[FRAME_PAYLOAD_PAA_ACC];
+    memcpy(&acc[0], &s_acc_x, 4);
+    memcpy(&acc[4], &s_acc_y, 4);
+    if (!frame_send(FRAME_TYPE_PAA_ACC, acc, FRAME_PAYLOAD_PAA_ACC)) {
         g_paa_dropped_frames++;
     }
 }

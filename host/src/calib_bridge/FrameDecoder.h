@@ -27,12 +27,14 @@ namespace calib_bridge
 
         using IcmCallback         = std::function<void(const framing::IcmSample&)>;
         using PaaCallback         = std::function<void(const framing::PaaSample&)>;
+        using PaaAccCallback      = std::function<void(const framing::PaaAccFrame&)>;
         using StatusCallback      = std::function<void(const framing::StatusFrame&)>;
         using PaaCalCallback      = std::function<void(const framing::PaaCalFrame&)>;
         using OrientationCallback = std::function<void(const framing::OrientationFrame&)>;
 
         void on_icm(IcmCallback cb)               { icm_cb_ = std::move(cb); }
         void on_paa(PaaCallback cb)               { paa_cb_ = std::move(cb); }
+        void on_paa_acc(PaaAccCallback cb)        { paa_acc_cb_ = std::move(cb); }
         void on_status(StatusCallback cb)         { status_cb_ = std::move(cb); }
         void on_paa_cal(PaaCalCallback cb)        { paa_cal_cb_ = std::move(cb); }
         void on_orientation(OrientationCallback cb) { orient_cb_ = std::move(cb); }
@@ -43,6 +45,10 @@ namespace calib_bridge
         static std::size_t encode_set_paa_cal(uint8_t* out, std::size_t out_cap,
                                               float cx_per_cm, float cy_per_cm,
                                               float height_mm);
+
+        // CMD_SET_PAA_OFFSET — Montageoffset (mm) vom Drehzentrum.
+        static std::size_t encode_set_paa_offset(uint8_t* out, std::size_t out_cap,
+                                                 float off_x_mm, float off_y_mm);
 
         // Trigger-Frames ohne Payload.
         static std::size_t encode_save_gyro_bias(uint8_t* out, std::size_t out_cap);
@@ -63,6 +69,7 @@ namespace calib_bridge
         Stats                stats_{};
         IcmCallback          icm_cb_;
         PaaCallback          paa_cb_;
+        PaaAccCallback       paa_acc_cb_;
         StatusCallback       status_cb_;
         PaaCalCallback       paa_cal_cb_;
         OrientationCallback  orient_cb_;

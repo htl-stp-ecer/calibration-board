@@ -71,6 +71,7 @@ static uint8_t rx_expected_payload(uint8_t type)
 {
     switch (type) {
         case FRAME_TYPE_CMD_SET_PAA_CAL:        return FRAME_PAYLOAD_CMD_SET_PAA_CAL;
+        case FRAME_TYPE_CMD_SET_PAA_OFFSET:     return FRAME_PAYLOAD_CMD_SET_PAA_OFFSET;
         case FRAME_TYPE_CMD_SAVE_GYRO_BIAS:     return FRAME_PAYLOAD_CMD_NONE;
         case FRAME_TYPE_CMD_RESET_GYRO_BIAS:    return FRAME_PAYLOAD_CMD_NONE;
         default: return 0;

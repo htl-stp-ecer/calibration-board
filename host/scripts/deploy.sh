@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ── Konfiguration ──────────────────────────────────────────────────────
-PI_HOST="${PI_HOST:-${1:-pi@192.168.100.112}}"
+PI_HOST="${RPI_HOST:-${1:-pi@192.168.100.112}}"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build-aarch64}"
 BIN="${BUILD_DIR}/raccoon-calib-bridge"
 SERVICE_NAME="raccoon-calib-bridge"

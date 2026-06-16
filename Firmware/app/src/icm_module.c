@@ -33,13 +33,19 @@ static void icm_loop(void)
 {
     if (s_init_status != ICM42688P_OK) return;
 
-    /* ICM-ODR ist 1 kHz — schneller polling liefert nur Duplikate. Wir
-     * lesen genau einmal pro SysTick-Millisekunde.  Sauberer wäre DRDY
-     * via EXTI auf PA15, aber das bleibt für später (siehe ICM_INT-Pin
-     * im docs/hardware.md). */
+    /* Wir lesen höchstens einmal pro SysTick-Millisekunde (≤1 kHz).  Der
+     * Scheduler-Loop läuft je nach Last langsamer — mit angeschlossenem
+     * PAA z.B. nur ~200 Hz — daher das echte dt aus der verstrichenen
+     * Zeit bestimmen statt 1 kHz anzunehmen.  Sonst integriert der
+     * Madgwick die Gyro-Rate um loop_rate/1000 zu klein → Yaw läuft
+     * massiv daneben (90° messen sich als ~20°). */
     uint32_t now = HAL_GetTick();
-    if (now == s_last_tick) return;
+    if (s_last_tick == 0u) { s_last_tick = now; return; } /* erste Probe: nur Zeitbasis */
+    uint32_t dt_ms = now - s_last_tick;
+    if (dt_ms == 0u) return;                 /* gleiche ms → noch warten */
     s_last_tick = now;
+    if (dt_ms > 50u) dt_ms = 50u;            /* Loop-Stall (Flash-Write) nicht als Sprung integrieren */
+    const float dt_s = (float)dt_ms * 0.001f;
 
     icm42688p_sample_t s;
     if (icm42688p_read_sample(&s) != ICM42688P_OK) return;
@@ -57,12 +63,12 @@ static void icm_loop(void)
     const float az_g   = (float)s.az / 8192.0f;
     const float temp_c = (float)s.temp / 132.48f + 25.0f;
 
-    /* Fusion-Step + Bias-Tracking.  Sample-Periode = 1 ms (1 kHz ODR).
-     * Konstant statt aus HAL_GetTick gerechnet — Jitter ist im
-     * Sub-Sample-Bereich, wirkt sich auf den Filter kaum aus. */
+    /* Fusion-Step + Bias-Tracking mit echtem dt (ms-Auflösung).  Die
+     * Summe der dt telescoped exakt zur verstrichenen Zeit → keine
+     * Integrations-Drift, nur leichtes Per-Sample-Quantisierungsrauschen. */
     imu_fusion_update(gx_dps, gy_dps, gz_dps,
                       ax_g, ay_g, az_g,
-                      0.001f, temp_c);
+                      dt_s, temp_c);
 
     /* Bias-korrigierte Gyro-Werte für das outgoing ICM-Frame —
      * Downstream-Konsumenten kriegen also "bereinigtes" Gyro. */

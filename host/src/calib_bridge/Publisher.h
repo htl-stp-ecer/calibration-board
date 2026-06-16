@@ -26,6 +26,9 @@ namespace calib_bridge
         void publish_icm(const framing::IcmSample& s);
         void publish_paa(const framing::PaaSample& s);
 
+        // Board-seitig integrierter signed Counts-Akkumulator (PAA_ACC).
+        void publish_paa_acc(const framing::PaaAccFrame& s);
+
         // PAA Kalibrierung (aus FW PAA_CAL frame).
         void publish_paa_cal(const framing::PaaCalFrame& s);
 

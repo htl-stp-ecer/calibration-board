@@ -20,18 +20,22 @@ namespace calib_bridge::framing
         Status      = 0x03,
         PaaCal      = 0x04,
         Orientation = 0x05,
+        PaaAcc      = 0x06,
         // Host → device
         CmdSetPaaCal       = 0x10,
         CmdSaveGyroBias    = 0x11,
         CmdResetGyroBias   = 0x12,
+        CmdSetPaaOffset    = 0x13,
     };
 
     inline constexpr uint8_t PAYLOAD_LEN_ICM             = 14;
     inline constexpr uint8_t PAYLOAD_LEN_PAA             = 10;
+    inline constexpr uint8_t PAYLOAD_LEN_PAA_ACC         = 8;
     inline constexpr uint8_t PAYLOAD_LEN_STATUS          = 20;
-    inline constexpr uint8_t PAYLOAD_LEN_PAA_CAL         = 13;
+    inline constexpr uint8_t PAYLOAD_LEN_PAA_CAL         = 21;
     inline constexpr uint8_t PAYLOAD_LEN_ORIENTATION     = 41;
     inline constexpr uint8_t PAYLOAD_LEN_CMD_SET_PAA_CAL = 12;
+    inline constexpr uint8_t PAYLOAD_LEN_CMD_SET_PAA_OFFSET = 8;
 
     inline constexpr uint8_t HDR_BYTES   = 7;   // sync + type + len + t_ms
     inline constexpr uint8_t OVERHEAD    = 8;   // hdr + crc8
@@ -85,12 +89,21 @@ namespace calib_bridge::framing
         uint8_t  motion = 0;
     };
 
+    struct PaaAccFrame
+    {
+        uint32_t t_ms = 0;
+        int32_t  acc_x = 0;   // frei laufender signed Counts-Akkumulator
+        int32_t  acc_y = 0;
+    };
+
     struct PaaCalFrame
     {
         uint32_t t_ms = 0;
         float    cx_per_cm = 0;
         float    cy_per_cm = 0;
         float    height_mm = 0;
+        float    off_x_mm  = 0;   // PAA-Montageoffset vom Drehzentrum (mm)
+        float    off_y_mm  = 0;
         bool     valid     = false;
     };
 

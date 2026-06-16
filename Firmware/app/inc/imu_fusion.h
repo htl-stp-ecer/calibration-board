@@ -7,9 +7,10 @@
  *
  * - Madgwick-Quaternion-Filter (kein Magnetometer) — Yaw driftet
  *   langsam, Roll/Pitch werden vom Gravity-Vektor korrigiert.
- * - At-Rest-Detection per Gyro-Magnitude + |Accel| ≈ 1 g.  Während
- *   at-rest läuft eine Exponential-Moving-Average auf den rohen
- *   Gyro-Werten → das ist der Bias.
+ * - At-Rest-Detection per kurzem Max-Min-Spread (Gyro-Achsen + Accel-
+ *   Betrag) mit Zeit-Dwell + Hysterese — ~0.5 s bis "still", sofort raus
+ *   bei Bewegung.  Während at-rest läuft eine Exponential-Moving-Average
+ *   auf den rohen Gyro-Werten → das ist der Bias.
  * - Der Bias wird live abgezogen bevor er in den Madgwick geht
  *   und bevor er auf USB raus geht (g_icm_gx/gy/gz Felder).
  *

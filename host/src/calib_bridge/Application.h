@@ -39,6 +39,7 @@ namespace calib_bridge
         void tick();
         void on_icm(const framing::IcmSample& s);
         void on_paa(const framing::PaaSample& s);
+        void on_paa_acc(const framing::PaaAccFrame& s);
         void on_status(const framing::StatusFrame& s);
         void on_paa_cal(const framing::PaaCalFrame& s);
         void on_orientation(const framing::OrientationFrame& s);
@@ -46,6 +47,7 @@ namespace calib_bridge
         void emit_status_if_due();
         void wire_command_subscribers();
         void send_set_paa_cal(float cx, float cy, float h);
+        void send_set_paa_offset(float off_x_mm, float off_y_mm);
         void send_save_gyro_bias();
         void send_reset_gyro_bias();
 
@@ -88,6 +90,12 @@ namespace calib_bridge
         float    paa_height_mm_ = 19.0f;
         bool     paa_cal_valid_ = false;
 
+        // PAA-Montageoffset vom Drehzentrum in cm (Body-Frame).  Vom FW via
+        // PAA_CAL frame gepusht (dort in mm).  Wird in on_paa() benutzt um
+        // den Rotations-Scheinfluss (ω×r) aus der Odometrie zu rechnen.
+        float    paa_off_x_cm_ = 0.0f;
+        float    paa_off_y_cm_ = 0.0f;
+
         // Integrierte Position in cm (kann vom Host via CMD_PAA_RESET_POS
         // genullt werden).
         float    paa_pos_x_cm_ = 0.0f;
@@ -97,6 +105,13 @@ namespace calib_bridge
         // ORIENTATION frame upgedated; Odometrie nutzt sie um PAA
         // body-frame Verschiebungen in den World-Frame zu rotieren.
         float    qw_ = 1.0f, qx_ = 0.0f, qy_ = 0.0f, qz_ = 0.0f;
+
+        // Heading (yaw, rad) beim vorigen PAA-Sample — für die ω×r-
+        // Korrektur brauchen wir die Heading-Änderung Δθ zwischen zwei
+        // PAA-Samples.  have_prev_yaw_ verhindert einen Δθ-Sprung beim
+        // allerersten Sample (und nach Odom-Reset).
+        float    prev_yaw_rad_  = 0.0f;
+        bool     have_prev_yaw_ = false;
 
         // Odometrie-Pose (World-Frame, cm).
         float    odom_pos_x_cm_ = 0.0f;

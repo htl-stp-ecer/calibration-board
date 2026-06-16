@@ -26,11 +26,18 @@ echo "  image     : ${IMAGE_NAME}"
 echo "  ccache    : ${CCACHE_VOL}"
 echo "  jobs      : ${JOBS}"
 
-# Submodule absichern.
-if [[ ! -f "${ROOT_DIR}/third_party/raccoon-transport/CMakeLists.txt" ]]; then
-    echo "• Initialisiere raccoon-transport submodule…"
-    (cd "${ROOT_DIR}" && git submodule update --init --recursive)
+# raccoon-transport lokalisieren.  third_party/raccoon-transport ist ein
+# Symlink in ein Schwester-Repo außerhalb von ROOT_DIR.  Im Container ist
+# nur /src (== ROOT_DIR) gemountet, der Symlink liefe ins Leere — deshalb
+# lösen wir ihn hier zum echten Pfad auf, mounten ihn separat nach
+# /transport und übergeben ihn via -DRACCOON_TRANSPORT_DIR.
+TRANSPORT_REAL="$(readlink -f "${ROOT_DIR}/third_party/raccoon-transport" 2>/dev/null || true)"
+if [[ -z "${TRANSPORT_REAL}" || ! -f "${TRANSPORT_REAL}/CMakeLists.txt" ]]; then
+    echo "✖ raccoon-transport nicht gefunden über ${ROOT_DIR}/third_party/raccoon-transport"
+    echo "  (Symlink kaputt?  Ziel: $(readlink "${ROOT_DIR}/third_party/raccoon-transport" 2>/dev/null || echo '—'))"
+    exit 1
 fi
+echo "  transport : ${TRANSPORT_REAL} → /transport (container)"
 
 # Image bauen wenn nicht vorhanden.
 if ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1 || [[ "${REBUILD_IMAGE}" == "1" ]]; then
@@ -56,6 +63,7 @@ docker_run() {
      # ${BUILD_DIR}/.ccache parken — das gehört uns garantiert.
     docker run --rm \
         -v "${ROOT_DIR}":/src \
+        -v "${TRANSPORT_REAL}":/transport \
         -v "${BUILD_DIR}/.ccache":/ccache \
         -w /src \
         -u "$(id -u):$(id -g)" \
@@ -69,6 +77,7 @@ if [[ ! -f "${BUILD_DIR}/CMakeCache.txt" ]]; then
     echo "• Configuring (${CMAKE_BUILD_TYPE})"
     docker_run "cmake -S /src -B /src/$(basename "${BUILD_DIR}") -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE=/src/cmake/toolchain-aarch64-linux-gnu.cmake \
+        -DRACCOON_TRANSPORT_DIR=/transport \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache \
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"

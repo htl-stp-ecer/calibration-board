@@ -13,11 +13,19 @@ namespace calib_bridge::Channels
     constexpr auto PAA_SHUTTER  = "raccoon/calib_board/paa/shutter";   // scalar_i32_t (raw)
     constexpr auto PAA_MOTION   = "raccoon/calib_board/paa/motion";    // scalar_i32_t (bitfield)
 
+    // Board-seitig integrierter signed Counts-Akkumulator (frei laufend).
+    // Der Host akkumuliert NICHT — der Kalibrier-Wizard nimmt Differenzen.
+    constexpr auto PAA_ACC_X    = "raccoon/calib_board/paa/acc_x";     // scalar_i32_t (counts)
+    constexpr auto PAA_ACC_Y    = "raccoon/calib_board/paa/acc_y";     // scalar_i32_t (counts)
+
     // PAA Kalibrierung (vom FW-Flash kommend, vom Host als Status republished)
     constexpr auto PAA_CAL_CX        = "raccoon/calib_board/paa/cal/cx_per_cm"; // scalar_f_t
     constexpr auto PAA_CAL_CY        = "raccoon/calib_board/paa/cal/cy_per_cm"; // scalar_f_t
     constexpr auto PAA_CAL_HEIGHT    = "raccoon/calib_board/paa/cal/height_mm"; // scalar_f_t
     constexpr auto PAA_CAL_VALID     = "raccoon/calib_board/paa/cal/valid";     // scalar_i32_t (0/1)
+    // PAA-Montageoffset vom Drehzentrum (mm, Body-Frame) — vom FW-Flash.
+    constexpr auto PAA_CAL_OFF_X     = "raccoon/calib_board/paa/cal/off_x_mm";  // scalar_f_t
+    constexpr auto PAA_CAL_OFF_Y     = "raccoon/calib_board/paa/cal/off_y_mm";  // scalar_f_t
 
     // Skalierte PAA-Werte (counts → cm) — Bridge wendet Kalibrierung an.
     constexpr auto PAA_CM_X      = "raccoon/calib_board/paa/cm/dx";   // scalar_f_t [cm/sample]
@@ -31,6 +39,8 @@ namespace calib_bridge::Channels
     //   cmd/paa/reset_position:   scalar_i32_t (value ignored, kept als Trigger)
     constexpr auto CMD_PAA_SET_CAL     = "raccoon/calib_board/cmd/paa/set_calibration";
     constexpr auto CMD_PAA_RESET_POS   = "raccoon/calib_board/cmd/paa/reset_position";
+    //   cmd/paa/set_offset: string_t mit JSON {"off_x_mm": 12.3, "off_y_mm": -4.5}
+    constexpr auto CMD_PAA_SET_OFFSET  = "raccoon/calib_board/cmd/paa/set_offset";
     //   cmd/icm/save_gyro_bias:   trigger — schreibt den aktuellen at-rest gemittelten Bias ins Flash
     //   cmd/icm/reset_gyro_bias:  trigger — setzt Bias auf 0 (nicht persistent)
     constexpr auto CMD_ICM_SAVE_GYRO_BIAS  = "raccoon/calib_board/cmd/icm/save_gyro_bias";

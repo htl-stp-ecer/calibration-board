@@ -14,26 +14,29 @@
  *   konstante ~1 s.  Während at-rest 5 s = 5000 Updates konvergiert das
  *   sauber.
  *
- * REST_BUF_SIZE / REST_SUBSAMPLE_DECIM:
- *   Wir behalten einen 10s-Ring-Buffer der Roh-Samples (downgesampled
- *   auf 100 Hz, also 1000 Slots à 4 Byte × 6 Achsen = 24 KB).  Die
- *   at-rest Detection schaut auf den **Max-Min-Spread** in diesem
- *   Buffer — das ist by-design bias-unabhängig, weil Spread nur misst
- *   wie WEIT die Werte um ihren eigenen Mittelpunkt variieren, nicht
- *   wo dieser Mittelpunkt liegt.
+ * At-Rest-Detection (REST_WIN / REST_DECIM / REST_DWELL_MS):
+ *   Kurzes gleitendes Fenster (~0.25 s) Max-Min-Spread auf den drei
+ *   Gyro-Achsen plus dem Accel-BETRAG.  Spread ist by-design bias- und
+ *   DC-unabhängig (misst nur die Variation, nicht den Offset), und der
+ *   Accel-Betrag liegt bei Ruhe immer bei 1 g — egal in welcher Lage.
+ *   "Still" wird erst nach REST_DWELL_MS ununterbrochener Ruhe gesetzt
+ *   (Zeit-basiert via HAL_GetTick, also rate-unabhängig); die erste
+ *   laute Probe wirft sofort zurück auf "moving" (Hysterese per Dwell).
  *
- * REST_GYRO_SPREAD_DPS / REST_ACCEL_SPREAD_G:
- *   "Still" gilt wenn der Max-Min-Spread über die letzten 10 s auf
- *   ALLEN sechs Achsen unter dem Schwellwert liegt.  Großzügig gewählt
- *   um Lüfter-Vibration / leichtes Tisch-Wackeln zu tolerieren.
+ *   Bewusst KEIN 10s-Buffer mehr: der war ausreißer-empfindlich (ein
+ *   Glitch-Sample vergiftete das ganze Fenster für 10 s), brauchte 10 s
+ *   Warmlauf bevor "rest" überhaupt möglich war, und hing an einer
+ *   exakten 1 kHz-Loop.  Jetzt: ~0.5 s bis "AT REST", sofort raus bei
+ *   Bewegung, ~0.5 KB statt 24 KB RAM.
  */
 #define MADGWICK_BETA          0.08f
 #define BIAS_EMA_ALPHA         0.001f
 
-#define REST_BUF_SIZE          1000u  /* 10 s @ 100 Hz */
-#define REST_SUBSAMPLE_DECIM   10u    /* 1 kHz / 10  = 100 Hz */
-#define REST_GYRO_SPREAD_DPS   15.0f
-#define REST_ACCEL_SPREAD_G    0.25f
+#define REST_WIN               32u    /* Fenstergröße (Samples nach Decim) */
+#define REST_DECIM             8u     /* nur jedes 8. Sample ins Fenster */
+#define REST_GYRO_SPREAD_DPS   2.5f   /* Max-Min je Gyro-Achse über Fenster */
+#define REST_ACCEL_SPREAD_G    0.05f  /* Max-Min des Accel-Betrags */
+#define REST_DWELL_MS          400u   /* so lange still bis "AT REST" */
 
 #define DEG_TO_RAD 0.01745329251f
 
@@ -43,16 +46,17 @@ static volatile float s_corr_gx = 0.0f, s_corr_gy = 0.0f, s_corr_gz = 0.0f;
 static volatile float s_bias_temp_c = 0.0f;
 static volatile bool  s_at_rest = false;
 
-/* 10s Ring-Buffer für at-rest Detection — je Achse 1000 floats. */
-static float s_buf_gx[REST_BUF_SIZE];
-static float s_buf_gy[REST_BUF_SIZE];
-static float s_buf_gz[REST_BUF_SIZE];
-static float s_buf_ax[REST_BUF_SIZE];
-static float s_buf_ay[REST_BUF_SIZE];
-static float s_buf_az[REST_BUF_SIZE];
-static uint32_t s_buf_head = 0;     /* nächster Schreibindex */
-static uint32_t s_buf_count = 0;    /* Anzahl gültiger Samples (clamped) */
-static uint32_t s_subsample_ctr = 0;
+/* Kurzes gleitendes Fenster für at-rest Detection (Gyro-Achsen + Accel-
+ * Betrag).  Decimiert, damit das Fenster ~0.25 s abdeckt ohne riesig zu
+ * werden. */
+static float s_w_gx[REST_WIN];
+static float s_w_gy[REST_WIN];
+static float s_w_gz[REST_WIN];
+static float s_w_an[REST_WIN];      /* Accel-Betrag ‖a‖ [g] */
+static uint32_t s_w_head = 0;       /* nächster Schreibindex */
+static uint32_t s_w_count = 0;      /* gefüllte Slots (clamped) */
+static uint32_t s_w_decim = 0;      /* Decimation-Zähler */
+static uint32_t s_quiet_since_ms = 0; /* HAL-Tick als Ruhe begann, 0 = laut */
 
 extern uint32_t HAL_GetTick(void);
 
@@ -73,9 +77,10 @@ void imu_fusion_init(float bx, float by, float bz)
     s_bias_x = bx; s_bias_y = by; s_bias_z = bz;
     s_corr_gx = s_corr_gy = s_corr_gz = 0.0f;
     s_at_rest = false;
-    s_buf_head = 0;
-    s_buf_count = 0;
-    s_subsample_ctr = 0;
+    s_w_head = 0;
+    s_w_count = 0;
+    s_w_decim = 0;
+    s_quiet_since_ms = 0;
     g_imu_rest_buf_count = 0;
 }
 
@@ -99,67 +104,60 @@ void imu_fusion_update(float gx_raw, float gy_raw, float gz_raw,
     s_corr_gy = gy;
     s_corr_gz = gz;
 
-    /* 2) At-rest Detection per 10 s Ring-Buffer + Max-Min-Spread.
-     *
-     *    Wir samplen mit 1 kHz, behalten aber nur jedes 10. Sample im
-     *    Buffer (= 100 Hz Decimation, 1000 Slots = 10 s).  Wenn der
-     *    Buffer voll ist, scannen wir alle 6 Achsen einmal kurz durch
-     *    und ermitteln Max − Min.  Spread auf ALLEN 6 Achsen unter dem
-     *    Schwellwert → still.  Bias ist by-design irrelevant: Spread
-     *    misst nur, wie WEIT die Werte sich vom eigenen Median wegbewegt
-     *    haben, nicht WO dieser Median liegt.
-     *
-     *    Buffer-Refresh kostet 6×1000 = 6 k Vergleiche × 100 Hz = 600 k/s
-     *    auf M7@216 MHz mit FPU → unter 1 % CPU. */
-    s_subsample_ctr++;
-    if (s_subsample_ctr >= REST_SUBSAMPLE_DECIM) {
-        s_subsample_ctr = 0;
-        s_buf_gx[s_buf_head] = gx_raw;
-        s_buf_gy[s_buf_head] = gy_raw;
-        s_buf_gz[s_buf_head] = gz_raw;
-        s_buf_ax[s_buf_head] = ax;
-        s_buf_ay[s_buf_head] = ay;
-        s_buf_az[s_buf_head] = az;
-        s_buf_head = (s_buf_head + 1u) % REST_BUF_SIZE;
-        if (s_buf_count < REST_BUF_SIZE) {
-            s_buf_count++;
-            g_imu_rest_buf_count = s_buf_count;
+    /* 2) At-rest Detection: kurzes gleitendes Fenster (Max-Min-Spread)
+     *    + Zeit-Dwell.  Spread ist bias- und DC-unabhängig (misst nur die
+     *    Variation, nicht den Offset), der Accel-BETRAG ‖a‖ liegt bei Ruhe
+     *    immer bei 1 g.  Wir nehmen nur jedes REST_DECIM-te Sample, damit
+     *    REST_WIN Slots ~0.25 s abdecken.  "Still" gilt erst nach
+     *    REST_DWELL_MS ununterbrochener Ruhe (Zeit-basiert → rate-unab-
+     *    hängig); jede laute Probe wirft sofort zurück. */
+    s_w_decim++;
+    if (s_w_decim >= REST_DECIM) {
+        s_w_decim = 0;
+        const float an = sqrtf(ax*ax + ay*ay + az*az);   /* noch un-normiert */
+        s_w_gx[s_w_head] = gx_raw;
+        s_w_gy[s_w_head] = gy_raw;
+        s_w_gz[s_w_head] = gz_raw;
+        s_w_an[s_w_head] = an;
+        s_w_head = (s_w_head + 1u) % REST_WIN;
+        if (s_w_count < REST_WIN) {
+            s_w_count++;
+            g_imu_rest_buf_count = s_w_count;
         }
 
-        if (s_buf_count >= REST_BUF_SIZE) {
-            float gx_min = s_buf_gx[0], gx_max = gx_min;
-            float gy_min = s_buf_gy[0], gy_max = gy_min;
-            float gz_min = s_buf_gz[0], gz_max = gz_min;
-            float ax_min = s_buf_ax[0], ax_max = ax_min;
-            float ay_min = s_buf_ay[0], ay_max = ay_min;
-            float az_min = s_buf_az[0], az_max = az_min;
-            for (uint32_t i = 1; i < REST_BUF_SIZE; i++) {
+        if (s_w_count >= REST_WIN) {
+            float gx_lo = s_w_gx[0], gx_hi = gx_lo;
+            float gy_lo = s_w_gy[0], gy_hi = gy_lo;
+            float gz_lo = s_w_gz[0], gz_hi = gz_lo;
+            float an_lo = s_w_an[0], an_hi = an_lo;
+            for (uint32_t i = 1; i < REST_WIN; i++) {
                 float v;
-                v = s_buf_gx[i]; if (v < gx_min) gx_min = v; if (v > gx_max) gx_max = v;
-                v = s_buf_gy[i]; if (v < gy_min) gy_min = v; if (v > gy_max) gy_max = v;
-                v = s_buf_gz[i]; if (v < gz_min) gz_min = v; if (v > gz_max) gz_max = v;
-                v = s_buf_ax[i]; if (v < ax_min) ax_min = v; if (v > ax_max) ax_max = v;
-                v = s_buf_ay[i]; if (v < ay_min) ay_min = v; if (v > ay_max) ay_max = v;
-                v = s_buf_az[i]; if (v < az_min) az_min = v; if (v > az_max) az_max = v;
+                v = s_w_gx[i]; if (v < gx_lo) gx_lo = v; if (v > gx_hi) gx_hi = v;
+                v = s_w_gy[i]; if (v < gy_lo) gy_lo = v; if (v > gy_hi) gy_hi = v;
+                v = s_w_gz[i]; if (v < gz_lo) gz_lo = v; if (v > gz_hi) gz_hi = v;
+                v = s_w_an[i]; if (v < an_lo) an_lo = v; if (v > an_hi) an_hi = v;
             }
-            float sg_x = gx_max - gx_min;
-            float sg_y = gy_max - gy_min;
-            float sg_z = gz_max - gz_min;
-            float sa_x = ax_max - ax_min;
-            float sa_y = ay_max - ay_min;
-            float sa_z = az_max - az_min;
+            const float sg_x = gx_hi - gx_lo;
+            const float sg_y = gy_hi - gy_lo;
+            const float sg_z = gz_hi - gz_lo;
+            const float sa   = an_hi - an_lo;
             g_imu_spread_gx_dps = sg_x;
             g_imu_spread_gy_dps = sg_y;
             g_imu_spread_gz_dps = sg_z;
-            g_imu_spread_ax_g   = sa_x;
-            g_imu_spread_ay_g   = sa_y;
-            g_imu_spread_az_g   = sa_z;
-            s_at_rest = (sg_x < REST_GYRO_SPREAD_DPS) &&
-                         (sg_y < REST_GYRO_SPREAD_DPS) &&
-                         (sg_z < REST_GYRO_SPREAD_DPS) &&
-                         (sa_x < REST_ACCEL_SPREAD_G) &&
-                         (sa_y < REST_ACCEL_SPREAD_G) &&
-                         (sa_z < REST_ACCEL_SPREAD_G);
+            g_imu_spread_ax_g   = sa;   /* repurposed: Spread des Accel-Betrags */
+
+            const bool quiet = (sg_x < REST_GYRO_SPREAD_DPS) &&
+                               (sg_y < REST_GYRO_SPREAD_DPS) &&
+                               (sg_z < REST_GYRO_SPREAD_DPS) &&
+                               (sa   < REST_ACCEL_SPREAD_G);
+            const uint32_t now = HAL_GetTick();
+            if (quiet) {
+                if (s_quiet_since_ms == 0u) s_quiet_since_ms = (now == 0u) ? 1u : now;
+                s_at_rest = (now - s_quiet_since_ms) >= REST_DWELL_MS;
+            } else {
+                s_quiet_since_ms = 0u;
+                s_at_rest = false;
+            }
         }
     }
 

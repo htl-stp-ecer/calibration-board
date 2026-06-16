@@ -138,7 +138,11 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 6;
   RCC_OscInitStruct.PLL.PLLN = 192;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  /* Power-Saving: SYSCLK 192 -> 96 MHz (PLLP /2 -> /4).  Halbiert die
+   * Core-Dynamic-Power.  USB bleibt 48 MHz (PLLQ=8 unabhängig von PLLP).
+   * delay_us() in paa5100.c ist auf 96 MHz kalibriert (us*32).  HINWEIS:
+   * CubeMX-Code ohne USER-CODE-Marker — bei .ioc-Regen überschrieben. */
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
   RCC_OscInitStruct.PLL.PLLQ = 8;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {

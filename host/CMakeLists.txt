@@ -18,13 +18,20 @@ option(CALIB_BRIDGE_WERROR "Treat warnings as errors" OFF)
 # Fallback: angrenzendes Schwester-Verzeichnis (häufig im Dev-Tree der
 # raccoon-Workspace).  Das lokale Submodule wird bevorzugt, damit
 # Production-Builds reproduzierbar sind.
+#
+# RACCOON_TRANSPORT_DIR erlaubt einen expliziten Override.  Nötig im
+# Docker-Cross-Build: dort ist third_party/raccoon-transport ein Symlink
+# nach ../../../raccoon-transport, der außerhalb des gemounteten /src
+# zeigt und im Container nicht aufgelöst werden kann.  build-cross.sh
+# mountet das echte Repo und setzt diese Variable darauf.
+set(RACCOON_TRANSPORT_DIR "" CACHE PATH "Expliziter Pfad zum raccoon-transport-Repo (überschreibt Submodule/Sibling-Erkennung)")
 set(RACCOON_TRANSPORT_SUBMODULE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/raccoon-transport")
 set(RACCOON_TRANSPORT_SIBLING   "${CMAKE_CURRENT_SOURCE_DIR}/../../raccoon-transport")
 
-if(EXISTS "${RACCOON_TRANSPORT_SUBMODULE}/CMakeLists.txt")
-    message(STATUS "raccoon-transport: using submodule at ${RACCOON_TRANSPORT_SUBMODULE}")
-    add_subdirectory("${RACCOON_TRANSPORT_SUBMODULE}" raccoon_transport_build)
-elseif(EXISTS "${RACCOON_TRANSPORT_SIBLING}/CMakeLists.txt")
+if(RACCOON_TRANSPORT_DIR AND EXISTS "${RACCOON_TRANSPORT_DIR}/CMakeLists.txt")
+    message(STATUS "raccoon-transport: using explicit RACCOON_TRANSPORT_DIR at ${RACCOON_TRANSPORT_DIR}")
+    add_subdirectory("${RACCOON_TRANSPORT_DIR}" raccoon_transport_build)
+elseif(EXISTS "${RACCOON_TRANSPORT_SUBMODULE}/CMakeLists.txt")
     message(WARNING "raccoon-transport submodule not initialised — falling back to sibling at ${RACCOON_TRANSPORT_SIBLING}")
     message(WARNING "Run: git submodule update --init --recursive  for a reproducible build")
     add_subdirectory("${RACCOON_TRANSPORT_SIBLING}" raccoon_transport_build)
